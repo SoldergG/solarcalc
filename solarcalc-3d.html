@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SolarCalc — A Calculadora Solar para Portugal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --bg:     #06090F;
+  --bg2:    #080C14;
+  --bg3:    #0C1120;
+  --card:   rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.07);
+  --amber:  #F4A823;
+  --amber2: #E8920A;
+  --amber3: #FFD166;
+  --green:  #10D67E;
+  --text:   rgba(255,252,245,0.88);
+  --muted:  rgba(255,252,245,0.42);
+}
+
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow-x:hidden;cursor:none;}
+
+/* CURSOR */
+.cur{position:fixed;z-index:9999;pointer-events:none;}
+.cur-dot{width:8px;height:8px;background:var(--amber);border-radius:50%;transition:transform .15s,background .3s;}
+.cur-ring{width:36px;height:36px;border:1.5px solid rgba(244,168,35,.5);border-radius:50%;position:fixed;z-index:9998;pointer-events:none;}
+
+/* NAV */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  padding:24px 64px;display:flex;align-items:center;justify-content:space-between;
+  transition:all .4s;
+}
+nav.stuck{
+  background:rgba(6,9,15,.88);backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);padding:16px 64px;
+}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;letter-spacing:-.03em;display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);}
+.logo-orb{width:28px;height:28px;background:radial-gradient(circle at 35% 35%,#FFD166,#E8920A);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px rgba(244,168,35,.4);animation:pulse-logo 4s ease-in-out infinite;}
+@keyframes pulse-logo{0%,100%{box-shadow:0 0 18px rgba(244,168,35,.4)}50%{box-shadow:0 0 32px rgba(244,168,35,.7)}}
+.logo span{color:var(--amber);}
+.nav-links{list-style:none;display:flex;align-items:center;gap:32px;}
+.nav-links a{color:var(--muted);font-size:.85rem;font-weight:500;text-decoration:none;transition:color .2s;}
+.nav-links a:hover{color:var(--text);}
+.nav-btn{background:var(--amber) !important;color:#000 !important;padding:9px 22px;border-radius:6px;font-weight:700 !important;}
+.nav-btn:hover{background:var(--amber3) !important;transform:translateY(-1px) !important;color:#000 !important;}
+
+/* HERO */
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;overflow:hidden;}
+#hero-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0;}
+.hero-gradient{
+  position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 60% 70% at 65% 50%,rgba(244,168,35,.04) 0%,transparent 65%),
+              linear-gradient(to bottom,transparent 55%,var(--bg) 100%),
+              linear-gradient(to right,rgba(6,9,15,.7) 0%,transparent 55%);
+}
+.hero-content{position:relative;z-index:2;padding:140px 64px 80px;max-width:620px;}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(244,168,35,.08);border:1px solid rgba(244,168,35,.2);
+  padding:5px 14px;border-radius:100px;font-size:.72rem;font-weight:600;
+  color:var(--amber);letter-spacing:.08em;text-transform:uppercase;margin-bottom:28px;
+  opacity:0;animation:up .7s .1s ease forwards;
+}
+.bdot{width:5px;height:5px;background:var(--green);border-radius:50%;animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+h1{
+  font-family:'Syne',sans-serif;
+  font-size:clamp(3rem,5.5vw,5.5rem);
+  font-weight:800;letter-spacing:-.04em;line-height:.93;
+  margin-bottom:24px;opacity:0;animation:up .8s .25s ease forwards;
+}
+h1 em{font-style:normal;font-family:'Instrument Serif',serif;font-style:italic;color:var(--amber);}
+.hero-sub{
+  font-size:1.05rem;color:var(--muted);line-height:1.8;max-width:480px;
+  font-weight:300;margin-bottom:40px;opacity:0;animation:up .8s .4s ease forwards;
+}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap;opacity:0;animation:up .8s .55s ease forwards;}
+.btn-primary{
+  background:var(--amber);color:#000;font-family:'DM Sans',sans-serif;
+  font-weight:700;font-size:.95rem;padding:14px 28px;border-radius:8px;
+  border:none;cursor:none;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+  transition:background .2s,transform .2s,box-shadow .3s;position:relative;overflow:hidden;
+}
+.btn-primary::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);transition:left .5s;}
+.btn-primary:hover::before{left:100%;}
+.btn-primary:hover{background:var(--amber3);transform:translateY(-2px);box-shadow:0 16px 40px rgba(244,168,35,.35);}
+.btn-ghost{
+  background:transparent;color:var(--text);font-family:'DM Sans',sans-serif;
+  font-weight:500;font-size:.95rem;padding:14px 24px;border-radius:8px;
+  border:1.5px solid var(--border);cursor:none;text-decoration:none;
+  display:inline-flex;align-items:center;gap:8px;transition:border-color .2s,background .2s;
+}
+.btn-ghost:hover{border-color:rgba(244,168,35,.4);background:rgba(244,168,35,.05);}
+.hero-stats{display:flex;gap:32px;margin-top:56px;opacity:0;animation:up .8s .7s ease forwards;}
+.h-stat-n{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;letter-spacing:-.04em;}
+.h-stat-n span{color:var(--amber);}
+.h-stat-l{font-size:.72rem;color:var(--muted);margin-top:2px;}
+.stat-sep{width:1px;background:var(--border);align-self:stretch;}
+@keyframes up{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+
+/* BAND */
+.band{
+  background:rgba(255,255,255,0.02);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  padding:18px 64px;display:flex;align-items:center;justify-content:center;gap:48px;overflow:hidden;
+}
+.band-item{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.8rem;white-space:nowrap;}
+.band-item strong{color:var(--text);font-weight:600;}
+.band-sep{color:rgba(255,255,255,.1);}
+
+/* SECTION COMMON */
+section{position:relative;}
+.s-label{display:inline-flex;align-items:center;gap:8px;font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:12px;}
+.s-label::before{content:'';width:16px;height:1.5px;background:var(--amber);}
+h2{font-family:'Syne',sans-serif;font-size:clamp(1.9rem,3.5vw,3rem);font-weight:700;letter-spacing:-.035em;line-height:1.08;margin-bottom:14px;}
+h2 em{font-style:normal;font-family:'Instrument Serif',serif;font-style:italic;color:var(--amber);}
+.s-desc{color:var(--muted);font-size:.95rem;line-height:1.78;max-width:460px;font-weight:300;}
+.reveal{opacity:0;transform:translateY(36px);transition:opacity .7s ease,transform .7s ease;}
+.reveal.in{opacity:1;transform:none;}
+
+/* HOW */
+.how{padding:110px 64px;background:var(--bg2);}
+.how-inner{max-width:1160px;margin:0 auto;}
+.how-head{text-align:center;margin-bottom:80px;}
+.how-head .s-label{justify-content:center;}
+.how-head .s-desc{margin:0 auto;}
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+.step-card{
+  background:var(--card);border:1px solid var(--border);border-radius:20px;
+  padding:44px 36px;position:relative;overflow:hidden;
+  transition:border-color .3s,transform .3s;
+}
+.step-card:hover{border-color:rgba(244,168,35,.25);transform:translateY(-6px);}
+.step-card::after{
+  content:'';position:absolute;inset:0;border-radius:20px;
+  background:radial-gradient(circle at 50% 0%,rgba(244,168,35,.06) 0%,transparent 65%);
+  opacity:0;transition:opacity .3s;pointer-events:none;
+}
+.step-card:hover::after{opacity:1;}
+.step-n{font-family:'Syne',sans-serif;font-size:5rem;font-weight:800;color:rgba(255,255,255,.04);line-height:1;letter-spacing:-.04em;margin-bottom:8px;}
+.step-icon{width:52px;height:52px;background:rgba(244,168,35,.1);border:1px solid rgba(244,168,35,.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:22px;}
+.step-card h3{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;letter-spacing:-.02em;margin-bottom:10px;}
+.step-card p{color:var(--muted);font-size:.875rem;line-height:1.68;font-weight:300;}
+
+/* MAP */
+.map-section{padding:110px 64px;background:var(--bg);}
+.map-inner{max-width:1160px;margin:0 auto;}
+.map-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:80px;align-items:center;}
+.map-visual{position:relative;height:500px;}
+#map-canvas{width:100%;height:100%;border-radius:20px;border:1px solid var(--border);}
+.map-legend{
+  position:absolute;bottom:20px;left:20px;
+  background:rgba(6,9,15,.92);backdrop-filter:blur(16px);
+  border:1px solid var(--border);border-radius:12px;padding:14px 18px;
+}
+.map-legend-title{font-size:.68rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+.legend-bar{width:140px;height:5px;border-radius:3px;background:linear-gradient(to right,#4DA6E8,#F4C542,#E8920A,#C0392B);margin-bottom:6px;}
+.legend-labels{display:flex;justify-content:space-between;font-size:.65rem;color:var(--muted);}
+.map-stats{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:32px;}
+.map-stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;}
+.map-stat-n{font-family:'Syne',sans-serif;font-size:1.7rem;font-weight:800;letter-spacing:-.04em;color:var(--amber);}
+.map-stat-l{font-size:.75rem;color:var(--muted);margin-top:4px;}
+.region-list{margin-top:24px;display:flex;flex-direction:column;gap:10px;}
+.region-item{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--card);border-radius:10px;border:1px solid transparent;transition:border-color .2s;}
+.region-item:hover{border-color:rgba(244,168,35,.2);}
+.region-name{font-size:.875rem;font-weight:500;}
+.region-bar-wrap{flex:1;margin:0 16px;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;}
+.region-bar{height:100%;border-radius:2px;background:linear-gradient(to right,var(--amber2),var(--amber3));}
+.region-val{font-family:'Syne',sans-serif;font-size:.8rem;font-weight:700;color:var(--amber);}
+
+/* CALC */
+.calc-section{padding:110px 64px;background:var(--bg2);}
+.calc-inner{max-width:1160px;margin:0 auto;display:grid;grid-template-columns:1fr 1.1fr;gap:80px;align-items:start;}
+.calc-feats{list-style:none;margin-top:32px;display:flex;flex-direction:column;gap:14px;}
+.calc-feat{display:flex;align-items:flex-start;gap:14px;opacity:0;transform:translateX(-16px);transition:opacity .5s,transform .5s;}
+.calc-feat.in{opacity:1;transform:none;}
+.feat-chk{width:22px;height:22px;border-radius:50%;background:rgba(16,214,126,.1);border:1px solid rgba(16,214,126,.25);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:var(--green);flex-shrink:0;margin-top:1px;}
+.feat-txt strong{display:block;font-size:.875rem;font-weight:500;margin-bottom:2px;}
+.feat-txt span{font-size:.8rem;color:var(--muted);font-weight:300;}
+.calc-card{
+  background:rgba(255,255,255,0.025);border:1px solid var(--border);
+  border-radius:22px;overflow:hidden;
+  box-shadow:0 32px 80px rgba(0,0,0,.5);backdrop-filter:blur(16px);
+}
+.calc-topbar{background:rgba(255,255,255,.04);padding:14px 20px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);}
+.dot2{width:10px;height:10px;border-radius:50%;}
+.dot2-r{background:#FF5F56;}.dot2-y{background:#FFBD2E;}.dot2-g{background:#27C93F;}
+.calc-topbar-title{font-size:.7rem;color:var(--muted);margin:0 auto;font-weight:400;}
+.calc-body{padding:28px;}
+.c-row{margin-bottom:22px;}
+.c-lbl{display:flex;justify-content:space-between;font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+.c-val{color:var(--text);font-family:'Syne',sans-serif;font-size:.9rem;font-weight:700;}
+.c-track{height:4px;background:rgba(255,255,255,.07);border-radius:3px;position:relative;overflow:visible;}
+.c-fill{height:100%;border-radius:3px;background:linear-gradient(to right,var(--amber2),var(--amber3));position:relative;transition:width .1s;}
+.c-thumb{position:absolute;right:-7px;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;background:var(--amber);border:2.5px solid var(--bg2);box-shadow:0 2px 10px rgba(244,168,35,.5);}
+.loc-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.loc-pill{padding:6px 14px;border-radius:6px;font-size:.75rem;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--muted);background:transparent;transition:all .2s;}
+.loc-pill.active{border-color:var(--amber);background:rgba(244,168,35,.1);color:var(--amber);}
+.c-result{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:14px;padding:22px;margin-top:20px;}
+.c-res-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.c-res-row:last-child{border-bottom:none;}
+.c-res-lbl{font-size:.78rem;color:var(--muted);}
+.c-res-val{font-family:'Syne',sans-serif;font-size:.95rem;font-weight:700;color:var(--amber3);}
+.c-res-val.grn{color:var(--green);}
+.c-cta{
+  width:100%;background:var(--amber);color:#000;font-family:'DM Sans',sans-serif;
+  font-weight:700;font-size:.9rem;padding:14px;border-radius:12px;border:none;
+  cursor:pointer;margin-top:20px;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:background .2s,transform .2s,box-shadow .3s;
+}
+.c-cta:hover{background:var(--amber3);transform:translateY(-1px);box-shadow:0 12px 32px rgba(244,168,35,.3);}
+
+/* FEATURES */
+.feats{padding:110px 64px;background:var(--bg);}
+.feats-inner{max-width:1160px;margin:0 auto;}
+.feats-head{text-align:center;margin-bottom:72px;}
+.feats-head .s-label{justify-content:center;}
+.feats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+.f-card{
+  background:var(--card);border:1px solid var(--border);border-radius:20px;
+  padding:36px 30px;transition:border-color .3s;cursor:default;
+  transform-style:preserve-3d;
+}
+.f-card:hover{border-color:rgba(244,168,35,.2);}
+.f-ico{
+  width:52px;height:52px;background:rgba(244,168,35,.07);border:1px solid rgba(244,168,35,.15);
+  border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;margin-bottom:20px;
+}
+.f-card h3{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;letter-spacing:-.02em;margin-bottom:10px;}
+.f-card p{font-size:.85rem;color:var(--muted);line-height:1.68;font-weight:300;}
+
+/* TESTIMONIALS */
+.testi{padding:90px 0;background:var(--bg2);overflow:hidden;}
+.testi-head{text-align:center;margin-bottom:52px;padding:0 64px;}
+.testi-head .s-label{justify-content:center;}
+.testi-track{display:flex;gap:18px;animation:scroll-t 36s linear infinite;width:max-content;}
+.testi-track:hover{animation-play-state:paused;}
+@keyframes scroll-t{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.t-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 30px;width:300px;flex-shrink:0;}
+.t-stars{color:var(--amber);font-size:.8rem;letter-spacing:3px;margin-bottom:14px;}
+.t-q{font-size:.875rem;color:rgba(255,252,245,.6);line-height:1.68;margin-bottom:20px;font-style:italic;font-weight:300;}
+.t-author{display:flex;align-items:center;gap:12px;}
+.t-av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--amber2),var(--amber));display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#000;}
+.t-n{font-size:.85rem;font-weight:600;}
+.t-r{font-size:.73rem;color:var(--muted);}
+
+/* CTA */
+.cta-final{padding:140px 64px;background:var(--bg3);text-align:center;position:relative;overflow:hidden;}
+.cta-final::before{content:'';position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(244,168,35,.08) 0%,transparent 60%);border-radius:50%;pointer-events:none;}
+.cta-final h2{color:var(--text);margin-bottom:16px;}
+.cta-final h2 em{color:var(--amber3);}
+.cta-final p{color:var(--muted);max-width:440px;margin:0 auto 48px;font-weight:300;line-height:1.75;}
+.cta-fine{margin-top:24px;font-size:.75rem;color:rgba(255,255,255,.2);}
+.cta-fine span{margin:0 8px;}
+
+/* FOOTER */
+footer{background:var(--bg);border-top:1px solid var(--border);padding:64px 64px 32px;}
+.foot-inner{max-width:1160px;margin:0 auto;}
+.foot-top{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:48px;margin-bottom:48px;}
+.foot-brand p{color:var(--muted);font-size:.85rem;max-width:240px;margin-top:12px;line-height:1.65;font-weight:300;}
+.foot-col h4{font-family:'Syne',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:16px;}
+.foot-col ul{list-style:none;display:flex;flex-direction:column;gap:10px;}
+.foot-col a{color:var(--muted);font-size:.875rem;text-decoration:none;transition:color .2s;}
+.foot-col a:hover{color:var(--amber);}
+.foot-bottom{border-top:1px solid var(--border);padding-top:24px;display:flex;justify-content:space-between;align-items:center;}
+.foot-bottom p{font-size:.75rem;color:rgba(255,255,255,.2);}
+
+/* RESPONSIVE */
+@media(max-width:960px){
+  nav,nav.stuck{padding:16px 24px;}
+  .hero-content{padding:120px 24px 80px;}
+  .band{gap:20px;padding:18px 24px;flex-wrap:wrap;}
+  .how,.map-section,.calc-section,.feats,.cta-final,footer{padding:72px 24px;}
+  .steps-grid,.map-grid,.calc-inner,.feats-grid{grid-template-columns:1fr;}
+  .map-visual{height:340px;}
+  .foot-top{grid-template-columns:1fr 1fr;}
+  .nav-links{display:none;}
+  .hero-stats{gap:20px;}
+  .testi{padding:64px 0;}
+  .testi-head{padding:0 24px;}
+}
+</style>
+</head>
+<body>
+
+<!-- CURSOR -->
+<div class="cur" id="cur"><div class="cur-dot" id="curDot"></div></div>
+<div class="cur-ring" id="curRing"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <a href="#" class="logo">
+    <div class="logo-orb">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5">
+        <circle cx="12" cy="12" r="5" fill="#000"/>
+        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </div>
+    Solar<span>Calc</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#como-funciona">Como Funciona</a></li>
+    <li><a href="#mapa-solar">Mapa Solar</a></li>
+    <li><a href="#calcular">Calculadora</a></li>
+    <li><a href="#calcular" class="nav-btn">Calcular Gratis</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-gradient"></div>
+  <div class="hero-content">
+    <div class="hero-badge"><div class="bdot"></div>Calculadora Solar N1 em Portugal</div>
+    <h1>Quanto pode a<br><em>energia solar</em><br>poupar-lhe?</h1>
+    <p class="hero-sub">Introduza os dados da sua casa e receba uma analise completa em 2 minutos - poupancas reais, payback e ROI personalizado para a sua morada em Portugal.</p>
+    <div class="hero-actions">
+      <a href="#calcular" class="btn-primary">Calcular Agora - Gratis</a>
+      <a href="#como-funciona" class="btn-ghost">Ver demonstracao</a>
+    </div>
+    <div class="hero-stats">
+      <div>
+        <div class="h-stat-n"><span id="cnt1">0</span></div>
+        <div class="h-stat-l">Habitacoes analisadas</div>
+      </div>
+      <div class="stat-sep"></div>
+      <div>
+        <div class="h-stat-n"><span id="cnt2">0</span><span style="color:var(--amber)">EUR</span></div>
+        <div class="h-stat-l">Poupanca media/ano</div>
+      </div>
+      <div class="stat-sep"></div>
+      <div>
+        <div class="h-stat-n"><span id="cnt3">0</span><span style="color:var(--amber);font-size:.85em"> anos</span></div>
+        <div class="h-stat-l">Payback medio PT</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BAND -->
+<div class="band">
+  <div class="band-item"><strong>PVGIS</strong> Base de dados europeia de irradiacao</div>
+  <span class="band-sep">·</span>
+  <div class="band-item"><strong>ERSE</strong> Tarifas eletricas oficiais</div>
+  <span class="band-sep">·</span>
+  <div class="band-item"><strong>DGEG</strong> Dados de producao nacional</div>
+  <span class="band-sep">·</span>
+  <div class="band-item"><strong>+12.000</strong> simulacoes realizadas</div>
+  <span class="band-sep">·</span>
+  <div class="band-item"><strong>Gratis</strong> para sempre</div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="como-funciona">
+  <div class="how-inner">
+    <div class="how-head reveal">
+      <div class="s-label">Processo</div>
+      <h2>Tres passos para<br>a sua analise solar</h2>
+      <p class="s-desc">Sem registos, sem complicacoes. Do zero ao relatorio completo em menos de 2 minutos.</p>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card reveal">
+        <div class="step-n">01</div>
+        <div class="step-icon">&#127968;</div>
+        <h3>Descreva a sua casa</h3>
+        <p>Area do telhado, orientacao cardinal, consumo eletrico mensal e concelho em Portugal.</p>
+      </div>
+      <div class="step-card reveal" style="transition-delay:.12s">
+        <div class="step-n">02</div>
+        <div class="step-icon">&#127757;</div>
+        <h3>Cruzamos com dados reais</h3>
+        <p>Usamos o PVGIS com dados de irradiacao solar real da sua regiao - do Minho ao Algarve.</p>
+      </div>
+      <div class="step-card reveal" style="transition-delay:.24s">
+        <div class="step-n">03</div>
+        <div class="step-icon">&#128202;</div>
+        <h3>Receba o seu relatorio</h3>
+        <p>Poupanca anual, payback, ROI, comparacao de sistemas e impacto ambiental. Tudo em PDF.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MAP SECTION -->
+<section class="map-section" id="mapa-solar">
+  <div class="map-inner">
+    <div class="map-grid">
+      <div>
+        <div class="s-label reveal">Mapa Solar</div>
+        <h2 class="reveal">Portugal tem um dos<br>melhores <em>indices solares</em><br>da Europa</h2>
+        <p class="s-desc reveal">Mais horas de sol do que qualquer outra nacao da Europa Ocidental. O seu potencial solar depende da sua localizacao.</p>
+        <div class="map-stats reveal">
+          <div class="map-stat"><div class="map-stat-n">1.750</div><div class="map-stat-l">kWh/m2 Algarve</div></div>
+          <div class="map-stat"><div class="map-stat-n">1.450</div><div class="map-stat-l">kWh/m2 Porto</div></div>
+        </div>
+        <div class="region-list reveal">
+          <div class="region-item"><span class="region-name">Algarve</span><div class="region-bar-wrap"><div class="region-bar" style="width:98%"></div></div><span class="region-val">1.750</span></div>
+          <div class="region-item"><span class="region-name">Alentejo</span><div class="region-bar-wrap"><div class="region-bar" style="width:90%"></div></div><span class="region-val">1.650</span></div>
+          <div class="region-item"><span class="region-name">Lisboa</span><div class="region-bar-wrap"><div class="region-bar" style="width:82%"></div></div><span class="region-val">1.580</span></div>
+          <div class="region-item"><span class="region-name">Porto</span><div class="region-bar-wrap"><div class="region-bar" style="width:72%"></div></div><span class="region-val">1.450</span></div>
+          <div class="region-item"><span class="region-name">Minho</span><div class="region-bar-wrap"><div class="region-bar" style="width:65%"></div></div><span class="region-val">1.320</span></div>
+        </div>
+      </div>
+      <div class="map-visual reveal">
+        <canvas id="map-canvas"></canvas>
+        <div class="map-legend">
+          <div class="map-legend-title">Irradiacao Solar (kWh/m2/ano)</div>
+          <div class="legend-bar"></div>
+          <div class="legend-labels"><span>1.200</span><span>1.400</span><span>1.600</span><span>1.750+</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CALC -->
+<section class="calc-section" id="calcular">
+  <div class="calc-inner">
+    <div>
+      <div class="s-label reveal">Calculadora</div>
+      <h2 class="reveal">Resultados reais,<br>em <em>tempo real</em></h2>
+      <p class="s-desc reveal">Calculamos com dados PVGIS, tarifas ERSE atualizadas e custos reais de instalacao em Portugal.</p>
+      <ul class="calc-feats">
+        <li class="calc-feat"><div class="feat-chk">v</div><div class="feat-txt"><strong>Dados PVGIS da Comissao Europeia</strong><span>Base de dados oficial de irradiacao solar</span></div></li>
+        <li class="calc-feat" style="transition-delay:.1s"><div class="feat-chk">v</div><div class="feat-txt"><strong>Tarifas EDP, Galp e Endesa</strong><span>Atualizadas mensalmente com dados ERSE</span></div></li>
+        <li class="calc-feat" style="transition-delay:.2s"><div class="feat-chk">v</div><div class="feat-txt"><strong>Relatorio PDF exportavel</strong><span>Para instaladores, bancos e AT fiscal</span></div></li>
+        <li class="calc-feat" style="transition-delay:.3s"><div class="feat-chk">v</div><div class="feat-txt"><strong>Comparacao de 3 sistemas</strong><span>3 kWp, 5 kWp e 8 kWp lado a lado</span></div></li>
+        <li class="calc-feat" style="transition-delay:.4s"><div class="feat-chk">v</div><div class="feat-txt"><strong>Incentivos e beneficios fiscais</strong><span>IRS, deducao de IVA e apoios municipais</span></div></li>
+      </ul>
+    </div>
+    <div class="calc-card reveal">
+      <div class="calc-topbar">
+        <div class="dot2 dot2-r"></div><div class="dot2 dot2-y"></div><div class="dot2 dot2-g"></div>
+        <span class="calc-topbar-title">SolarCalc - Simulacao ao Vivo</span>
+      </div>
+      <div class="calc-body">
+        <div class="c-row">
+          <div class="c-lbl">Consumo mensal <span class="c-val" id="vConsumo">320 kWh</span></div>
+          <div class="c-track"><div class="c-fill" id="fConsumo" style="width:55%"><div class="c-thumb"></div></div></div>
+        </div>
+        <div class="c-row">
+          <div class="c-lbl">Area do telhado <span class="c-val" id="vArea">28 m2</span></div>
+          <div class="c-track"><div class="c-fill" id="fArea" style="width:40%"><div class="c-thumb"></div></div></div>
+        </div>
+        <div class="c-row">
+          <div class="c-lbl">Localizacao</div>
+          <div class="loc-pills">
+            <div class="loc-pill active" onclick="setLoc(this,1.0)">Lisboa</div>
+            <div class="loc-pill" onclick="setLoc(this,0.85)">Porto</div>
+            <div class="loc-pill" onclick="setLoc(this,1.15)">Algarve</div>
+            <div class="loc-pill" onclick="setLoc(this,1.1)">Alentejo</div>
+          </div>
+        </div>
+        <div class="c-result">
+          <div class="c-res-row"><span class="c-res-lbl">Producao anual estimada</span><span class="c-res-val" id="rProd">4.340 kWh</span></div>
+          <div class="c-res-row"><span class="c-res-lbl">Poupanca anual</span><span class="c-res-val grn" id="rSave">EUR 868</span></div>
+          <div class="c-res-row"><span class="c-res-lbl">Payback estimado</span><span class="c-res-val" id="rPay">7.5 anos</span></div>
+          <div class="c-res-row"><span class="c-res-lbl">CO2 evitado/ano</span><span class="c-res-val" id="rCo2">2.1 ton</span></div>
+        </div>
+        <button class="c-cta">Ver relatorio completo</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="feats">
+  <div class="feats-inner">
+    <div class="feats-head reveal">
+      <div class="s-label">Funcionalidades</div>
+      <h2>Tudo para decidir<br>com <em>confianca</em></h2>
+    </div>
+    <div class="feats-grid">
+      <div class="f-card reveal" data-tilt><div class="f-ico">&#128506;</div><h3>Mapa Solar Interativo</h3><p>Visualize a irradiacao real por concelho. Explore o potencial solar de todo o pais.</p></div>
+      <div class="f-card reveal" data-tilt style="transition-delay:.08s"><div class="f-ico">&#128200;</div><h3>Curva de Payback</h3><p>Grafico interativo que mostra exatamente quando o sistema comeca a dar retorno mes a mes.</p></div>
+      <div class="f-card reveal" data-tilt style="transition-delay:.16s"><div class="f-ico">&#127974;</div><h3>Simulador de Financiamento</h3><p>Compare compra a vista vs. credito verde. Integra bonificacoes de juros e apoios do PRR.</p></div>
+      <div class="f-card reveal" data-tilt style="transition-delay:.24s"><div class="f-ico">&#128267;</div><h3>Bateria vs. Sem Bateria</h3><p>Analise se a bateria compensa no seu caso. Muitas vezes nao compensa - dizemos-lhe a verdade.</p></div>
+      <div class="f-card reveal" data-tilt style="transition-delay:.32s"><div class="f-ico">&#128196;</div><h3>Relatorio PDF Profissional</h3><p>Exportacao completa com todos os dados tecnicos. Aceite por instaladores e instituicoes bancarias.</p></div>
+      <div class="f-card reveal" data-tilt style="transition-delay:.4s"><div class="f-ico">&#127807;</div><h3>Calculadora de Impacto CO2</h3><p>Veja o impacto ambiental em toneladas de CO2, arvores equivalentes e anos de emissoes evitadas.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testi">
+  <div class="testi-head">
+    <div class="s-label reveal">Depoimentos</div>
+    <h2 class="reveal">O que dizem as familias<br>que ja <em>calcularam</em></h2>
+  </div>
+  <div style="overflow:hidden;mask-image:linear-gradient(to right,transparent,black 8%,black 92%,transparent)">
+    <div class="testi-track" id="testi-track"></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-final">
+  <div class="s-label reveal" style="justify-content:center">Comece Hoje</div>
+  <h2 class="reveal">O sol brilha todos os dias.<br>O seu dinheiro tambem <em>pode</em>.</h2>
+  <p class="reveal">Calcule gratuitamente em 2 minutos. Sem registo obrigatorio, sem compromissos, sem cartao de credito.</p>
+  <div class="reveal" style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+    <a href="#calcular" class="btn-primary" style="font-size:1rem;padding:16px 32px">Calcular Poupanca Agora</a>
+    <a href="#" class="btn-ghost" style="font-size:1rem;padding:16px 26px">Ver planos e precos</a>
+  </div>
+  <p class="cta-fine reveal">v Gratis para sempre <span>·</span> v Sem cartao de credito <span>·</span> v Dados 100% privados <span>·</span> v RGPD compliant</p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-inner">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <a href="#" class="logo" style="font-size:1.15rem">
+          <div class="logo-orb" style="width:24px;height:24px;animation:none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5"><circle cx="12" cy="12" r="5" fill="#000"/></svg>
+          </div>
+          Solar<span>Calc</span>
+        </a>
+        <p>A calculadora solar mais completa para Portugal. Dados reais, resultados em que pode confiar.</p>
+      </div>
+      <div class="foot-col"><h4>Produto</h4><ul><li><a href="#">Calculadora</a></li><li><a href="#">Funcionalidades</a></li><li><a href="#">Precos</a></li><li><a href="#">API para Instaladores</a></li></ul></div>
+      <div class="foot-col"><h4>Recursos</h4><ul><li><a href="#">Guia Solar PT</a></li><li><a href="#">Incentivos 2026</a></li><li><a href="#">Blog</a></li><li><a href="#">FAQ</a></li></ul></div>
+      <div class="foot-col"><h4>Empresa</h4><ul><li><a href="#">Sobre Nos</a></li><li><a href="#">Contacto</a></li><li><a href="#">Privacidade</a></li><li><a href="#">Termos</a></li></ul></div>
+    </div>
+    <div class="foot-bottom">
+      <p>2026 SolarCalc. Todos os direitos reservados.</p>
+      <p>Feito em Portugal - LT Technologies</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════
+// CURSOR
+// ═══════════════════════════════════════════════
+var curDot  = document.getElementById('curDot');
+var curEl   = document.getElementById('cur');
+var curRing = document.getElementById('curRing');
+var mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',function(e){
+  mx=e.clientX; my=e.clientY;
+  curEl.style.left=(mx-4)+'px'; curEl.style.top=(my-4)+'px';
+});
+(function animR(){
+  rx+=(mx-rx-18)*.1; ry+=(my-ry-18)*.1;
+  curRing.style.left=rx+'px'; curRing.style.top=ry+'px';
+  requestAnimationFrame(animR);
+})();
+document.querySelectorAll('a,button,[onclick],[data-tilt]').forEach(function(el){
+  el.addEventListener('mouseenter',function(){ curDot.style.transform='scale(2.5)'; curDot.style.background='#FFD166'; });
+  el.addEventListener('mouseleave',function(){ curDot.style.transform='scale(1)'; curDot.style.background='#F4A823'; });
+});
+
+// ═══════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════
+window.addEventListener('scroll',function(){
+  document.getElementById('nav').classList.toggle('stuck',window.scrollY>50);
+});
+
+// ═══════════════════════════════════════════════
+// SCROLL REVEAL
+// ═══════════════════════════════════════════════
+var rObs=new IntersectionObserver(function(entries){
+  entries.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('in'); });
+},{threshold:.1,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal,.calc-feat').forEach(function(el){ rObs.observe(el); });
+
+// ═══════════════════════════════════════════════
+// COUNTERS
+// ═══════════════════════════════════════════════
+function counter(el,target,decimals){
+  decimals=decimals||0;
+  var dur=2200; var start=performance.now();
+  (function tick(now){
+    var p=Math.min((now-start)/dur,1);
+    var e2=1-Math.pow(1-p,3);
+    var v=target*e2;
+    el.textContent=decimals?v.toFixed(decimals):Math.round(v).toLocaleString('pt-PT');
+    if(p<1)requestAnimationFrame(tick);
+  })(start);
+}
+var cObs=new IntersectionObserver(function(entries){
+  if(entries[0].isIntersecting){
+    counter(document.getElementById('cnt1'),12847);
+    counter(document.getElementById('cnt2'),847);
+    counter(document.getElementById('cnt3'),6.8,1);
+    cObs.disconnect();
+  }
+},{threshold:.5});
+cObs.observe(document.querySelector('.hero-stats'));
+
+// ═══════════════════════════════════════════════
+// HERO THREE.JS — 3D SOLAR PANEL + SUN
+// ═══════════════════════════════════════════════
+(function initHero(){
+  var canvas = document.getElementById('hero-canvas');
+  var W = window.innerWidth, H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+
+  var renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(W,H);
+  renderer.setClearColor(0x000000,0);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 200);
+  camera.position.set(0, 0.5, 9);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x1a2040, 1.0));
+  var sunLight = new THREE.DirectionalLight(0xffa040, 2.8);
+  sunLight.position.set(6, 4, 3);
+  scene.add(sunLight);
+  var rimLight = new THREE.DirectionalLight(0x4488ff, 0.5);
+  rimLight.position.set(-4,-1,-3);
+  scene.add(rimLight);
+
+  // Stars
+  var starCount = 2000;
+  var starGeo = new THREE.BufferGeometry();
+  var starPos = new Float32Array(starCount * 3);
+  for(var i=0; i<starCount*3; i+=3){
+    starPos[i]   = (Math.random()-0.5)*140;
+    starPos[i+1] = (Math.random()-0.5)*90;
+    starPos[i+2] = (Math.random()-0.5)*80 - 20;
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos,3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color:0xffffff,size:0.055,transparent:true,opacity:0.45,sizeAttenuation:true})));
+
+  // Floating energy particles
+  var partCount = 350;
+  var partGeo = new THREE.BufferGeometry();
+  var partPos = new Float32Array(partCount * 3);
+  var partVel = new Float32Array(partCount * 3);
+  for(var i=0; i<partCount; i++){
+    var i3=i*3;
+    partPos[i3]  =(Math.random()-0.5)*20;
+    partPos[i3+1]=(Math.random()-0.5)*12;
+    partPos[i3+2]=(Math.random()-0.5)*8;
+    partVel[i3]  =(Math.random()-0.5)*0.003;
+    partVel[i3+1]=Math.random()*0.005+0.001;
+    partVel[i3+2]=(Math.random()-0.5)*0.002;
+  }
+  partGeo.setAttribute('position', new THREE.BufferAttribute(partPos,3));
+  var partMat = new THREE.PointsMaterial({color:0xF4A823,size:0.05,transparent:true,opacity:0.5,sizeAttenuation:true});
+  var particles = new THREE.Points(partGeo, partMat);
+  scene.add(particles);
+
+  // Sun sphere
+  var sunSphere = new THREE.Mesh(
+    new THREE.SphereGeometry(1.5, 48, 48),
+    new THREE.MeshStandardMaterial({color:0xff9820,emissive:0xe07010,emissiveIntensity:1.3,roughness:0.5})
+  );
+  sunSphere.position.set(4.8, 2.4, -3.5);
+  scene.add(sunSphere);
+
+  // Sun glow layers
+  var glow1 = new THREE.Mesh(
+    new THREE.SphereGeometry(2.3,32,32),
+    new THREE.MeshBasicMaterial({color:0xff7700,transparent:true,opacity:0.07,side:THREE.BackSide})
+  );
+  glow1.position.copy(sunSphere.position); scene.add(glow1);
+
+  var glow2 = new THREE.Mesh(
+    new THREE.SphereGeometry(3.5,32,32),
+    new THREE.MeshBasicMaterial({color:0xff5500,transparent:true,opacity:0.035,side:THREE.BackSide})
+  );
+  glow2.position.copy(sunSphere.position); scene.add(glow2);
+
+  // Point light from sun
+  var sunPt = new THREE.PointLight(0xffa040, 2.0, 30);
+  sunPt.position.copy(sunSphere.position);
+  scene.add(sunPt);
+
+  // ── SOLAR PANEL ─────────────────────────────────────
+  function buildPanel(){
+    var g = new THREE.Group();
+
+    // Frame backing
+    var frameMat = new THREE.MeshPhongMaterial({color:0x4a5568,specular:0x8899aa,shininess:60});
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(5.1,3.1,0.12), frameMat));
+
+    // Edge frames
+    var edgeMat = new THREE.MeshPhongMaterial({color:0x667788,specular:0xaabbcc,shininess:80});
+    var eT=new THREE.Mesh(new THREE.BoxGeometry(5.2,0.13,0.18),edgeMat); eT.position.set(0,1.62,0); g.add(eT);
+    var eB=eT.clone(); eB.position.set(0,-1.62,0); g.add(eB);
+    var eL=new THREE.Mesh(new THREE.BoxGeometry(0.13,3.22,0.18),edgeMat); eL.position.set(-2.62,0,0); g.add(eL);
+    var eR=eL.clone(); eR.position.set(2.62,0,0); g.add(eR);
+
+    // Solar cells: 5 cols x 3 rows
+    var cols=5, rows=3, cw=0.86, ch=0.86, gap=0.06;
+    var totalW=cols*cw+(cols-1)*gap, totalH=rows*ch+(rows-1)*gap;
+    var cellMat = new THREE.MeshPhongMaterial({color:0x0d1b3e,specular:0x2255cc,shininess:140,emissive:0x050e20,emissiveIntensity:0.4});
+    var borderMat = new THREE.MeshBasicMaterial({color:0x172540});
+
+    for(var r=0; r<rows; r++){
+      for(var c=0; c<cols; c++){
+        var px = -totalW/2 + c*(cw+gap) + cw/2;
+        var py = totalH/2  - r*(ch+gap) - ch/2;
+
+        var bdr = new THREE.Mesh(new THREE.PlaneGeometry(cw+0.03,ch+0.03), borderMat);
+        bdr.position.set(px,py,0.065); g.add(bdr);
+
+        var cell = new THREE.Mesh(new THREE.PlaneGeometry(cw-0.02,ch-0.02), cellMat);
+        cell.position.set(px,py,0.072); g.add(cell);
+
+        // Busbars
+        var bbMat = new THREE.MeshBasicMaterial({color:0x3366cc,transparent:true,opacity:0.55});
+        for(var bl=0; bl<3; bl++){
+          var bb=new THREE.Mesh(new THREE.PlaneGeometry(0.012,ch-0.06),bbMat);
+          bb.position.set(px-0.26+bl*0.26, py, 0.074); g.add(bb);
+        }
+        // Horizontal busbar
+        var hbb=new THREE.Mesh(new THREE.PlaneGeometry(cw-0.04,0.012),bbMat);
+        hbb.position.set(px,py,0.074); g.add(hbb);
+      }
+    }
+
+    // Support leg
+    var legMat = new THREE.MeshPhongMaterial({color:0x556070,specular:0x889aaa,shininess:40});
+    var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.07,2.0,10),legMat);
+    leg.position.set(0,-2.55,-0.4); leg.rotation.x=0.18; g.add(leg);
+
+    // Foot
+    var foot = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.09,0.4),legMat);
+    foot.position.set(0,-3.6,-0.68); g.add(foot);
+
+    // Horizontal back bar
+    var bar = new THREE.Mesh(new THREE.BoxGeometry(4.8,0.06,0.09),legMat);
+    bar.position.set(0,0,-0.05); g.add(bar);
+
+    return g;
+  }
+
+  var panel = buildPanel();
+  panel.position.set(2.2, 0.4, 0);
+  panel.rotation.y = -0.35;
+  panel.rotation.x = -0.06;
+  scene.add(panel);
+
+  // Energy flow particles on panel surface
+  var flowCount = 90;
+  var flowGeo = new THREE.BufferGeometry();
+  var flowPos2 = new Float32Array(flowCount*3);
+  var flowT = new Float32Array(flowCount);
+  for(var i=0; i<flowCount; i++){
+    flowT[i]=Math.random();
+    var fc=i%5, fr=Math.floor(i/5)%3;
+    flowPos2[i*3]  =-2.0+fc*0.95;
+    flowPos2[i*3+1]= 1.0-fr*0.95;
+    flowPos2[i*3+2]= 0.1;
+  }
+  flowGeo.setAttribute('position',new THREE.BufferAttribute(flowPos2,3));
+  var flowMat = new THREE.PointsMaterial({color:0x88ddff,size:0.05,transparent:true,opacity:0.65,sizeAttenuation:true});
+  var flowPts = new THREE.Points(flowGeo, flowMat);
+  panel.add(flowPts);
+
+  // Ground
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(60,30),
+    new THREE.MeshStandardMaterial({color:0x070b16,roughness:0.98})
+  );
+  ground.rotation.x=-Math.PI/2; ground.position.set(0,-3.7,0);
+  scene.add(ground);
+
+  // Mouse state
+  var mouseX=0, mouseY=0;
+  var tPanX=0, tPanY=0, tSunX=0, tSunY=0;
+  var sunBase = sunSphere.position.clone();
+
+  window.addEventListener('mousemove',function(e){
+    mouseX=(e.clientX/window.innerWidth)*2-1;
+    mouseY=-(e.clientY/window.innerHeight)*2+1;
+  });
+
+  var t=0;
+  function render(){
+    requestAnimationFrame(render);
+    t+=0.016;
+
+    // Smooth lerp
+    tPanX+=(mouseX*0.28-tPanX)*0.045;
+    tPanY+=(mouseY*0.14-tPanY)*0.045;
+    tSunX+=(-mouseX*0.18-tSunX)*0.028;
+    tSunY+=(-mouseY*0.12-tSunY)*0.028;
+
+    panel.rotation.y = -0.35 + tPanX;
+    panel.rotation.x = -0.06 + tPanY;
+
+    sunSphere.position.x = sunBase.x + tSunX;
+    sunSphere.position.y = sunBase.y + tSunY;
+    glow1.position.copy(sunSphere.position);
+    glow2.position.copy(sunSphere.position);
+    sunPt.position.copy(sunSphere.position);
+
+    // Sun pulse
+    var pulse = 1+Math.sin(t*0.7)*0.025;
+    sunSphere.scale.setScalar(pulse);
+    sunSphere.material.emissiveIntensity = 1.3+Math.sin(t*0.55)*0.35;
+
+    // Float ambient particles
+    var fp=partGeo.attributes.position.array;
+    for(var i=0; i<partCount; i++){
+      var i3=i*3;
+      fp[i3]+=partVel[i3]; fp[i3+1]+=partVel[i3+1]; fp[i3+2]+=partVel[i3+2];
+      if(fp[i3+1]>7){ fp[i3+1]=-6; fp[i3]=(Math.random()-0.5)*20; }
+    }
+    partGeo.attributes.position.needsUpdate=true;
+
+    // Flow particles
+    var ff=flowGeo.attributes.position.array;
+    for(var i=0; i<flowCount; i++){
+      flowT[i]+=0.009;
+      if(flowT[i]>1) flowT[i]=0;
+      var fc2=i%5, fr2=Math.floor(i/5)%3;
+      ff[i*3]  =-2.0+fc2*0.95+(flowT[i]-0.5)*0.7;
+      ff[i*3+1]= 1.0-fr2*0.95+Math.sin(flowT[i]*Math.PI*2)*0.09;
+      ff[i*3+2]= 0.1+Math.sin(t*2.2+i)*0.012;
+    }
+    flowGeo.attributes.position.needsUpdate=true;
+    flowMat.opacity=0.45+Math.sin(t*1.8)*0.2;
+
+    camera.position.y = 0.5+Math.sin(t*0.25)*0.07;
+
+    renderer.render(scene,camera);
+  }
+  render();
+
+  window.addEventListener('resize',function(){
+    var W2=window.innerWidth, H2=window.innerHeight;
+    camera.aspect=W2/H2; camera.updateProjectionMatrix();
+    renderer.setSize(W2,H2);
+  });
+})();
+
+// ═══════════════════════════════════════════════
+// MAP CANVAS
+// ═══════════════════════════════════════════════
+(function initMap(){
+  var canvas=document.getElementById('map-canvas');
+  var parent=canvas.parentElement;
+
+  function drawMap(){
+    var W=parent.clientWidth||500, H=parent.clientHeight||500;
+    canvas.width=W; canvas.height=H;
+    var ctx=canvas.getContext('2d');
+
+    ctx.fillStyle='#080c14'; ctx.fillRect(0,0,W,H);
+
+    ctx.strokeStyle='rgba(255,255,255,0.035)'; ctx.lineWidth=1;
+    for(var x=0;x<W;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for(var y=0;y<H;y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    var pts=[
+      [.22,.05],[.35,.02],[.52,.03],[.62,.06],[.68,.1],
+      [.7,.15],[.72,.22],[.74,.28],[.76,.35],[.78,.42],
+      [.8,.5],[.82,.57],[.78,.63],[.75,.7],[.72,.76],
+      [.68,.82],[.64,.88],[.58,.92],[.52,.95],[.45,.97],
+      [.38,.96],[.32,.93],[.26,.88],[.22,.82],[.18,.75],
+      [.16,.68],[.15,.6],[.16,.52],[.17,.44],[.18,.36],
+      [.19,.28],[.2,.2],[.22,.12],[.22,.05]
+    ].map(function(p){ return [p[0]*W, p[1]*H]; });
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
+    ctx.closePath();
+    ctx.save(); ctx.clip();
+
+    var hg=ctx.createLinearGradient(0,H*.05,0,H*.96);
+    hg.addColorStop(0,'rgba(30,80,160,.65)');
+    hg.addColorStop(.3,'rgba(80,140,200,.6)');
+    hg.addColorStop(.55,'rgba(200,140,30,.65)');
+    hg.addColorStop(.8,'rgba(220,80,20,.7)');
+    hg.addColorStop(1,'rgba(190,30,10,.75)');
+    ctx.fillStyle=hg; ctx.fillRect(0,0,W,H);
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
+    ctx.closePath();
+    ctx.strokeStyle='rgba(244,168,35,.35)'; ctx.lineWidth=1.5; ctx.stroke();
+
+    var labels=[
+      [.38,.14,'Minho','1.320'],[.46,.31,'Porto','1.450'],
+      [.49,.5,'Centro','1.520'],[.47,.63,'Lisboa','1.580'],
+      [.52,.76,'Alentejo','1.650'],[.46,.89,'Algarve','1.750+']
+    ];
+    labels.forEach(function(lb){
+      var px=lb[0]*W, py=lb[1]*H;
+      ctx.beginPath(); ctx.arc(px,py,4,0,Math.PI*2);
+      ctx.fillStyle='rgba(244,168,35,.9)';
+      ctx.shadowColor='rgba(244,168,35,.6)'; ctx.shadowBlur=10;
+      ctx.fill(); ctx.shadowBlur=0;
+      ctx.font='bold 11px "DM Sans",sans-serif';
+      ctx.fillStyle='rgba(255,252,245,.88)'; ctx.textAlign='left';
+      ctx.fillText(lb[2],px+8,py-2);
+      ctx.font='10px "DM Sans",sans-serif';
+      ctx.fillStyle='rgba(244,168,35,.75)';
+      ctx.fillText(lb[3],px+8,py+11);
+    });
+
+    ctx.font='italic 12px "Instrument Serif",serif';
+    ctx.fillStyle='rgba(100,160,220,.3)'; ctx.textAlign='center';
+    ctx.fillText('Oceano',W*.08,H*.5);
+    ctx.fillText('Atlantico',W*.08,H*.5+17);
+  }
+  drawMap();
+  window.addEventListener('resize',drawMap);
+})();
+
+// ═══════════════════════════════════════════════
+// TESTIMONIALS
+// ═══════════════════════════════════════════════
+var tData=[
+  {q:'Em 10 minutos percebi que ia poupar 900 EUR por ano. Instalei 3 semanas depois.',n:'Miguel S.',r:'Oeiras, Lisboa',i:'MS'},
+  {q:'O relatorio PDF foi fundamental para o banco. Profissional e detalhado.',n:'Ana P.',r:'Braga',i:'AP'},
+  {q:'Comparei com os calculos do instalador - bateu certo ao centimo.',n:'Rui F.',r:'Faro, Algarve',i:'RF'},
+  {q:'Nao sabia nada de paineis. Depois de 5 min no SolarCalc ja fazia perguntas inteligentes.',n:'Sofia L.',r:'Cascais',i:'SL'},
+  {q:'A comparacao com e sem bateria foi decisiva. Poupei 2.000 EUR ao escolher bem.',n:'Joao M.',r:'Setubal',i:'JM'},
+  {q:'Mostrei a minha vizinha e ela tambem instalou. Partilhamos o instalador.',n:'Carla R.',r:'Almada',i:'CR'},
+  {q:'Muito mais completo do que as ferramentas dos instaladores. E gratis!',n:'Pedro A.',r:'Coimbra',i:'PA'},
+  {q:'O simulador de financiamento mostrou-me que o credito verde compensa imenso.',n:'Helena V.',r:'Evora',i:'HV'},
+];
+var track=document.getElementById('testi-track');
+tData.concat(tData).forEach(function(t){
+  track.innerHTML+='<div class="t-card"><div class="t-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div><p class="t-q">"'+t.q+'"</p><div class="t-author"><div class="t-av">'+t.i+'</div><div><div class="t-n">'+t.n+'</div><div class="t-r">'+t.r+'</div></div></div></div>';
+});
+
+// ═══════════════════════════════════════════════
+// LIVE CALCULATOR
+// ═══════════════════════════════════════════════
+var locMult=1.0, cVal=320, aVal=28, cDir=1, aDir=1;
+function calcResults(){
+  var prod=Math.round(aVal*155*locMult);
+  var save=Math.round(prod*0.2);
+  var pay=(6500/Math.max(1,save)).toFixed(1);
+  var co2=(prod*0.000486).toFixed(1);
+  document.getElementById('rProd').textContent=prod.toLocaleString('pt-PT')+' kWh';
+  document.getElementById('rSave').textContent='EUR '+save.toLocaleString('pt-PT');
+  document.getElementById('rPay').textContent=pay+' anos';
+  document.getElementById('rCo2').textContent=co2+' ton';
+}
+function setLoc(el,mult){
+  locMult=mult;
+  document.querySelectorAll('.loc-pill').forEach(function(p){ p.classList.remove('active'); });
+  el.classList.add('active');
+  calcResults();
+}
+setInterval(function(){
+  cVal+=cDir*4; if(cVal>=620||cVal<=130)cDir*=-1;
+  aVal+=aDir*.4; if(aVal>=58||aVal<=12)aDir*=-1;
+  var pC=(cVal-100)/580*100, pA=(aVal-8)/72*100;
+  document.getElementById('fConsumo').style.width=pC+'%';
+  document.getElementById('fArea').style.width=pA+'%';
+  document.getElementById('vConsumo').textContent=Math.round(cVal)+' kWh';
+  document.getElementById('vArea').textContent=Math.round(aVal)+' m2';
+  calcResults();
+},55);
+
+// ═══════════════════════════════════════════════
+// CARD 3D TILT
+// ═══════════════════════════════════════════════
+document.querySelectorAll('[data-tilt]').forEach(function(card){
+  card.addEventListener('mousemove',function(e){
+    var rect=card.getBoundingClientRect();
+    var cx=(e.clientX-rect.left)/rect.width -0.5;
+    var cy=(e.clientY-rect.top )/rect.height-0.5;
+    card.style.transform='perspective(700px) rotateX('+(-cy*12)+'deg) rotateY('+(cx*12)+'deg) translateY(-4px)';
+    card.style.transition='transform .08s ease';
+  });
+  card.addEventListener('mouseleave',function(){
+    card.style.transform='perspective(700px) rotateX(0) rotateY(0) translateY(0)';
+    card.style.transition='transform .5s ease';
+  });
+});
+</script>
+</body>
+</html>

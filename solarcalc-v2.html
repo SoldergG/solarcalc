@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SolarCalc — A Calculadora Solar para Portugal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --cream:   #FFFCF5;
+  --cream2:  #FEF7E8;
+  --cream3:  #FDF0CC;
+  --sun:     #E8920A;
+  --sun-lt:  #F4A823;
+  --sun-xlt: #FFC857;
+  --sun-pale:#FFF3D6;
+  --ink:     #1C1A14;
+  --ink2:    #3D3A30;
+  --muted:   #8A8070;
+  --green:   #1A8C4E;
+  --border:  rgba(28,26,20,0.08);
+  --shadow:  0 2px 20px rgba(28,26,20,0.07);
+}
+
+html { scroll-behavior:smooth; }
+body { background:var(--cream); color:var(--ink); font-family:'DM Sans',sans-serif; overflow-x:hidden; cursor:none; }
+
+/* CURSOR */
+.cur { position:fixed; z-index:9999; pointer-events:none; mix-blend-mode:multiply; }
+.cur-dot { width:10px; height:10px; background:var(--sun); border-radius:50%; transition:transform .15s, width .3s, height .3s; }
+.cur-ring { width:38px; height:38px; border:1.5px solid rgba(232,146,10,.45); border-radius:50%; position:fixed; z-index:9998; pointer-events:none; transition:transform .08s; }
+
+/* GRAIN */
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:500; opacity:.025;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* NAV */
+nav {
+  position:fixed; top:0; left:0; right:0; z-index:200;
+  padding:22px 56px; display:flex; align-items:center; justify-content:space-between;
+  transition:all .4s;
+}
+nav.stuck {
+  background:rgba(255,252,245,.92); backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border); padding:14px 56px;
+  box-shadow:0 4px 24px rgba(28,26,20,.06);
+}
+.logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.35rem; letter-spacing:-.03em; display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--ink); }
+.logo-sun { width:30px; height:30px; background:var(--sun); border-radius:50%; display:flex; align-items:center; justify-content:center; position:relative; animation:logo-pulse 4s ease-in-out infinite; }
+.logo-sun svg { width:16px; height:16px; fill:#fff; }
+.logo-sun::after { content:''; position:absolute; inset:-5px; border-radius:50%; background:radial-gradient(circle,rgba(232,146,10,.25) 0%,transparent 70%); animation:logo-pulse 4s ease-in-out infinite reverse; }
+@keyframes logo-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+.logo span { color:var(--sun); }
+.nav-links { list-style:none; display:flex; align-items:center; gap:32px; }
+.nav-links a { color:var(--muted); font-size:.875rem; font-weight:500; text-decoration:none; transition:color .2s; }
+.nav-links a:hover { color:var(--ink); }
+.nav-btn { background:var(--ink); color:#fff !important; padding:10px 22px; border-radius:6px; transition:background .2s,transform .2s !important; }
+.nav-btn:hover { background:var(--sun) !important; transform:translateY(-1px) !important; }
+
+/* HERO */
+.hero { min-height:100vh; display:grid; grid-template-columns:1fr 1fr; align-items:center; padding:100px 56px 60px; gap:40px; position:relative; overflow:hidden; background:var(--cream); }
+.hero::before { content:''; position:absolute; top:0; left:0; right:0; bottom:0; background:radial-gradient(ellipse 60% 70% at 70% 50%, rgba(244,168,35,.07) 0%, transparent 65%); pointer-events:none; }
+
+/* HERO CONTENT */
+.hero-left { position:relative; z-index:2; }
+.hero-badge { display:inline-flex; align-items:center; gap:8px; background:var(--sun-pale); border:1px solid rgba(232,146,10,.2); padding:5px 14px; border-radius:100px; font-size:.75rem; font-weight:600; color:var(--sun); letter-spacing:.06em; text-transform:uppercase; margin-bottom:28px; opacity:0; animation:up .7s .1s ease forwards; }
+.badge-dot { width:6px; height:6px; background:var(--green); border-radius:50%; animation:blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+h1 { font-family:'Syne',sans-serif; font-size:clamp(2.8rem,5vw,4.8rem); font-weight:800; letter-spacing:-.04em; line-height:.96; margin-bottom:24px; opacity:0; animation:up .8s .25s ease forwards; }
+h1 em { font-style:normal; font-family:'Instrument Serif',serif; font-style:italic; color:var(--sun); }
+.hero-sub { font-size:1.05rem; color:var(--muted); line-height:1.75; max-width:460px; font-weight:300; margin-bottom:40px; opacity:0; animation:up .8s .4s ease forwards; }
+.hero-actions { display:flex; gap:12px; flex-wrap:wrap; opacity:0; animation:up .8s .55s ease forwards; }
+.btn-sol { background:var(--sun); color:#fff; font-family:'DM Sans',sans-serif; font-weight:600; font-size:.95rem; padding:14px 28px; border-radius:8px; border:none; cursor:none; text-decoration:none; display:inline-flex; align-items:center; gap:8px; transition:background .2s,transform .2s,box-shadow .3s; position:relative; overflow:hidden; }
+.btn-sol::before { content:''; position:absolute; top:0; left:-100%; width:100%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent); transition:left .5s; }
+.btn-sol:hover::before { left:100%; }
+.btn-sol:hover { background:var(--sun-lt); transform:translateY(-2px); box-shadow:0 12px 32px rgba(232,146,10,.3); }
+.btn-outline { background:transparent; color:var(--ink); font-family:'DM Sans',sans-serif; font-weight:500; font-size:.95rem; padding:14px 24px; border-radius:8px; border:1.5px solid var(--border); cursor:none; text-decoration:none; display:inline-flex; align-items:center; gap:8px; transition:border-color .2s,background .2s; }
+.btn-outline:hover { border-color:var(--sun); background:var(--sun-pale); }
+
+/* HERO STATS */
+.hero-stats { display:flex; gap:32px; margin-top:48px; opacity:0; animation:up .8s .7s ease forwards; }
+.h-stat { }
+.h-stat-n { font-family:'Syne',sans-serif; font-size:1.9rem; font-weight:800; letter-spacing:-.04em; color:var(--ink); }
+.h-stat-n span { color:var(--sun); }
+.h-stat-l { font-size:.75rem; color:var(--muted); font-weight:400; margin-top:2px; }
+.stat-div { width:1px; background:var(--border); align-self:stretch; }
+
+/* 3D GLOBE SIDE */
+.hero-right { position:relative; display:flex; align-items:center; justify-content:center; height:580px; }
+#globe-canvas { width:100%; height:100%; }
+.globe-label { position:absolute; background:var(--cream); border:1px solid var(--border); border-radius:10px; padding:10px 16px; box-shadow:var(--shadow); font-size:.78rem; pointer-events:none; white-space:nowrap; }
+.globe-label strong { display:block; font-family:'Syne',sans-serif; font-size:.9rem; font-weight:700; color:var(--ink); }
+.globe-label span { color:var(--muted); font-weight:300; }
+.lbl-portugal { top:40%; left:10%; animation:float-lbl 5s ease-in-out infinite; }
+.lbl-spain { top:30%; left:5%; animation:float-lbl 5s ease-in-out infinite .8s; }
+.lbl-africa { bottom:25%; left:15%; animation:float-lbl 5s ease-in-out infinite 1.5s; }
+@keyframes float-lbl { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+.globe-ring { position:absolute; inset:10%; border-radius:50%; border:1px solid rgba(232,146,10,.08); animation:spin-ring 20s linear infinite; pointer-events:none; }
+.globe-ring-2 { position:absolute; inset:5%; border-radius:50%; border:1px dashed rgba(232,146,10,.05); animation:spin-ring 35s linear infinite reverse; pointer-events:none; }
+@keyframes spin-ring { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+@keyframes up { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+
+/* BAND */
+.band { background:var(--ink); padding:20px 56px; display:flex; align-items:center; justify-content:center; gap:48px; overflow:hidden; }
+.band-item { display:flex; align-items:center; gap:12px; color:rgba(255,252,245,.5); font-size:.82rem; font-weight:400; white-space:nowrap; }
+.band-item strong { color:rgba(255,252,245,.9); font-weight:600; }
+.band-sep { color:rgba(255,252,245,.15); font-size:1.2rem; }
+
+/* SECTION COMMONS */
+section { position:relative; }
+.s-label { display:inline-flex; align-items:center; gap:8px; font-size:.72rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--sun); margin-bottom:12px; }
+.s-label::before { content:''; width:18px; height:1.5px; background:var(--sun); }
+h2 { font-family:'Syne',sans-serif; font-size:clamp(1.9rem,3.5vw,2.9rem); font-weight:700; letter-spacing:-.035em; line-height:1.1; margin-bottom:14px; }
+h2 em { font-style:normal; font-family:'Instrument Serif',serif; font-style:italic; color:var(--sun); }
+.s-desc { color:var(--muted); font-size:.95rem; line-height:1.75; max-width:460px; font-weight:300; }
+.reveal { opacity:0; transform:translateY(36px); transition:opacity .7s ease,transform .7s ease; }
+.reveal.in { opacity:1; transform:none; }
+
+/* HOW */
+.how { padding:100px 56px; background:var(--cream2); }
+.how-inner { max-width:1140px; margin:0 auto; }
+.how-head { text-align:center; margin-bottom:72px; }
+.how-head .s-desc { margin:0 auto; }
+.steps-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
+.step-card { background:var(--cream); border:1px solid var(--border); border-radius:16px; padding:40px 36px; position:relative; overflow:hidden; transition:transform .3s,box-shadow .3s; }
+.step-card:hover { transform:translateY(-6px); box-shadow:0 20px 48px rgba(28,26,20,.1); }
+.step-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(to right,var(--sun),var(--sun-xlt)); transform:scaleX(0); transform-origin:left; transition:transform .4s; }
+.step-card:hover::before { transform:scaleX(1); }
+.step-n { font-family:'Syne',sans-serif; font-size:5rem; font-weight:800; color:rgba(28,26,20,.04); line-height:1; letter-spacing:-.04em; margin-bottom:8px; }
+.step-icon { width:52px; height:52px; background:var(--sun-pale); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; margin-bottom:20px; }
+.step-card h3 { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700; letter-spacing:-.02em; margin-bottom:10px; }
+.step-card p { color:var(--muted); font-size:.875rem; line-height:1.65; font-weight:300; }
+
+/* MAP SECTION */
+.map-section { padding:100px 56px; background:var(--cream); }
+.map-inner { max-width:1140px; margin:0 auto; }
+.map-grid { display:grid; grid-template-columns:1fr 1.3fr; gap:80px; align-items:center; }
+.map-visual { position:relative; height:480px; }
+#map-canvas { width:100%; height:100%; border-radius:20px; }
+.map-legend { position:absolute; bottom:20px; left:20px; background:rgba(255,252,245,.95); border:1px solid var(--border); border-radius:10px; padding:14px 18px; }
+.map-legend-title { font-size:.7rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; }
+.legend-bar { width:140px; height:6px; border-radius:3px; background:linear-gradient(to right,#4DA6E8,#F4C542,#E8920A,#C0392B); margin-bottom:6px; }
+.legend-labels { display:flex; justify-content:space-between; font-size:.68rem; color:var(--muted); }
+.map-stats { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:32px; }
+.map-stat { background:var(--cream2); border:1px solid var(--border); border-radius:12px; padding:20px 22px; }
+.map-stat-n { font-family:'Syne',sans-serif; font-size:1.6rem; font-weight:800; letter-spacing:-.04em; color:var(--sun); }
+.map-stat-l { font-size:.78rem; color:var(--muted); margin-top:4px; font-weight:400; }
+.region-list { margin-top:24px; display:flex; flex-direction:column; gap:10px; }
+.region-item { display:flex; align-items:center; justify-content:space-between; padding:12px 18px; background:var(--cream2); border-radius:10px; border:1px solid transparent; transition:border-color .2s; }
+.region-item:hover { border-color:var(--sun-xlt); }
+.region-name { font-size:.875rem; font-weight:500; }
+.region-bar-wrap { flex:1; margin:0 16px; height:4px; background:var(--cream3); border-radius:2px; overflow:hidden; }
+.region-bar { height:100%; border-radius:2px; background:linear-gradient(to right,var(--sun-lt),var(--sun)); }
+.region-val { font-family:'Syne',sans-serif; font-size:.82rem; font-weight:700; color:var(--sun); }
+
+/* CALC SECTION */
+.calc-section { padding:100px 56px; background:var(--cream2); }
+.calc-inner { max-width:1140px; margin:0 auto; display:grid; grid-template-columns:1fr 1.1fr; gap:72px; align-items:start; }
+.calc-feats { list-style:none; margin-top:32px; display:flex; flex-direction:column; gap:14px; }
+.calc-feat { display:flex; align-items:flex-start; gap:14px; opacity:0; transform:translateX(-16px); transition:opacity .5s,transform .5s; }
+.calc-feat.in { opacity:1; transform:none; }
+.feat-chk { width:22px; height:22px; border-radius:50%; background:rgba(26,140,78,.1); border:1px solid rgba(26,140,78,.25); display:flex; align-items:center; justify-content:center; font-size:.62rem; color:var(--green); flex-shrink:0; margin-top:1px; }
+.feat-txt strong { display:block; font-size:.875rem; font-weight:500; margin-bottom:2px; }
+.feat-txt span { font-size:.8rem; color:var(--muted); font-weight:300; }
+
+/* CALC CARD */
+.calc-card { background:var(--cream); border:1.5px solid var(--border); border-radius:20px; overflow:hidden; box-shadow:0 24px 64px rgba(28,26,20,.1); }
+.calc-topbar { background:var(--ink); padding:14px 20px; display:flex; align-items:center; gap:8px; }
+.dot2 { width:10px; height:10px; border-radius:50%; }
+.dot2-r { background:#FF5F56; } .dot2-y { background:#FFBD2E; } .dot2-g { background:#27C93F; }
+.calc-topbar-title { font-size:.72rem; color:rgba(255,252,245,.4); margin:0 auto; font-weight:400; }
+.calc-body { padding:28px; }
+.c-row { margin-bottom:22px; }
+.c-lbl { display:flex; justify-content:space-between; font-size:.73rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; }
+.c-val { color:var(--ink); font-family:'Syne',sans-serif; font-size:.9rem; font-weight:700; }
+.c-track { height:5px; background:var(--cream2); border-radius:3px; position:relative; overflow:visible; }
+.c-fill { height:100%; border-radius:3px; background:linear-gradient(to right,var(--sun),var(--sun-xlt)); position:relative; transition:width .1s; }
+.c-thumb { position:absolute; right:-7px; top:50%; transform:translateY(-50%); width:14px; height:14px; border-radius:50%; background:var(--sun); border:2.5px solid #fff; box-shadow:0 2px 6px rgba(232,146,10,.4); }
+.loc-pills { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+.loc-pill { padding:6px 14px; border-radius:6px; font-size:.76rem; font-weight:500; cursor:pointer; border:1.5px solid var(--border); color:var(--muted); background:var(--cream2); transition:all .2s; }
+.loc-pill.active { border-color:var(--sun); background:var(--sun-pale); color:var(--sun); }
+.c-result { background:linear-gradient(135deg,var(--ink) 0%,#2D2820 100%); border-radius:12px; padding:22px; margin-top:20px; }
+.c-res-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,252,245,.06); }
+.c-res-row:last-child { border-bottom:none; }
+.c-res-lbl { font-size:.78rem; color:rgba(255,252,245,.45); }
+.c-res-val { font-family:'Syne',sans-serif; font-size:.95rem; font-weight:700; color:var(--sun-xlt); }
+.c-res-val.grn { color:#4ADE80; }
+.c-cta { width:100%; background:var(--sun); color:#fff; font-family:'DM Sans',sans-serif; font-weight:600; font-size:.9rem; padding:14px; border-radius:10px; border:none; cursor:pointer; margin-top:20px; display:flex; align-items:center; justify-content:center; gap:8px; transition:background .2s,transform .2s; }
+.c-cta:hover { background:var(--sun-lt); transform:translateY(-1px); }
+
+/* FEATURES */
+.feats { padding:100px 56px; background:var(--cream); }
+.feats-inner { max-width:1140px; margin:0 auto; }
+.feats-head { text-align:center; margin-bottom:64px; }
+.feats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+.f-card { border:1.5px solid var(--border); border-radius:16px; padding:36px 30px; background:var(--cream); transition:border-color .3s,transform .3s,box-shadow .3s; position:relative; overflow:hidden; }
+.f-card:hover { border-color:rgba(232,146,10,.35); transform:translateY(-4px); box-shadow:0 20px 48px rgba(28,26,20,.08); }
+.f-card::before { content:''; position:absolute; bottom:-60px; right:-60px; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle,rgba(232,146,10,.06) 0%,transparent 70%); }
+.f-ico { font-size:2rem; margin-bottom:20px; display:block; }
+.f-card h3 { font-family:'Syne',sans-serif; font-size:1rem; font-weight:700; letter-spacing:-.02em; margin-bottom:10px; }
+.f-card p { font-size:.85rem; color:var(--muted); line-height:1.65; font-weight:300; }
+
+/* TESTIMONIALS */
+.testi { padding:80px 0; background:var(--cream2); overflow:hidden; }
+.testi-head { text-align:center; margin-bottom:48px; padding:0 56px; }
+.testi-track { display:flex; gap:20px; animation:scroll-t 32s linear infinite; width:max-content; }
+.testi-track:hover { animation-play-state:paused; }
+@keyframes scroll-t { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+.t-card { background:var(--cream); border:1.5px solid var(--border); border-radius:14px; padding:28px 30px; width:310px; flex-shrink:0; }
+.t-stars { color:var(--sun); font-size:.82rem; letter-spacing:3px; margin-bottom:14px; }
+.t-q { font-size:.875rem; color:var(--ink2); line-height:1.65; margin-bottom:20px; font-weight:300; font-style:italic; }
+.t-author { display:flex; align-items:center; gap:12px; }
+.t-av { width:36px; height:36px; border-radius:50%; background:var(--ink); display:flex; align-items:center; justify-content:center; font-size:.75rem; font-weight:700; color:var(--sun-xlt); }
+.t-n { font-size:.85rem; font-weight:600; }
+.t-r { font-size:.75rem; color:var(--muted); }
+
+/* CTA FINAL */
+.cta-final { padding:120px 56px; background:var(--ink); text-align:center; position:relative; overflow:hidden; }
+.cta-final::before { content:''; position:absolute; top:-30%; left:50%; transform:translateX(-50%); width:700px; height:700px; background:radial-gradient(circle,rgba(232,146,10,.12) 0%,transparent 65%); border-radius:50%; pointer-events:none; }
+.cta-final h2 { color:#fff; margin-bottom:16px; }
+.cta-final h2 em { color:var(--sun-xlt); }
+.cta-final p { color:rgba(255,252,245,.5); max-width:440px; margin:0 auto 48px; font-weight:300; line-height:1.7; }
+.cta-fine { margin-top:24px; font-size:.78rem; color:rgba(255,252,245,.3); }
+.cta-fine span { margin:0 8px; }
+
+/* FOOTER */
+footer { background:var(--cream2); border-top:1px solid var(--border); padding:56px 56px 32px; }
+.foot-inner { max-width:1140px; margin:0 auto; }
+.foot-top { display:grid; grid-template-columns:1.4fr repeat(3,1fr); gap:48px; margin-bottom:48px; }
+.foot-brand p { color:var(--muted); font-size:.85rem; max-width:240px; margin-top:12px; line-height:1.6; font-weight:300; }
+.foot-col h4 { font-family:'Syne',sans-serif; font-size:.72rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ink); margin-bottom:16px; }
+.foot-col ul { list-style:none; display:flex; flex-direction:column; gap:10px; }
+.foot-col a { color:var(--muted); font-size:.875rem; text-decoration:none; transition:color .2s; }
+.foot-col a:hover { color:var(--sun); }
+.foot-bottom { border-top:1px solid var(--border); padding-top:24px; display:flex; justify-content:space-between; align-items:center; }
+.foot-bottom p { font-size:.78rem; color:var(--muted); }
+
+/* RESPONSIVE */
+@media(max-width:960px) {
+  nav { padding:18px 24px; }
+  nav.stuck { padding:14px 24px; }
+  .hero { grid-template-columns:1fr; padding:100px 24px 60px; text-align:center; }
+  .hero-left { order:2; }
+  .hero-right { order:1; height:340px; }
+  .hero-stats { justify-content:center; }
+  .hero-actions { justify-content:center; }
+  .hero-sub { margin:0 auto 40px; }
+  .band { gap:24px; padding:20px 24px; flex-wrap:wrap; }
+  .how,.map-section,.calc-section,.feats,.cta-final,footer { padding:72px 24px; }
+  .steps-grid,.map-grid,.calc-inner,.feats-grid { grid-template-columns:1fr; }
+  .map-visual { height:320px; }
+  .foot-top { grid-template-columns:1fr 1fr; }
+  .nav-links { display:none; }
+  .testi { padding:60px 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="cur" id="cur"><div class="cur-dot" id="curDot"></div></div>
+<div class="cur-ring" id="curRing"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <a href="#" class="logo">
+    <div class="logo-sun">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3" stroke="#fff" stroke-width="2"/><line x1="12" y1="21" x2="12" y2="23" stroke="#fff" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="#fff" stroke-width="2"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="#fff" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke="#fff" stroke-width="2"/><line x1="21" y1="12" x2="23" y2="12" stroke="#fff" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="#fff" stroke-width="2"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="#fff" stroke-width="2"/></svg>
+    </div>
+    Solar<span>Calc</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#como-funciona">Como Funciona</a></li>
+    <li><a href="#mapa-solar">Mapa Solar</a></li>
+    <li><a href="#calcular">Calculadora</a></li>
+    <li><a href="#calcular" class="nav-btn">Calcular Grátis</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <div class="hero-left">
+    <div class="hero-badge"><div class="badge-dot"></div>Calculadora Solar Nº1 em Portugal</div>
+    <h1>Quanto pode a<br><em>energia solar</em><br>poupar-lhe?</h1>
+    <p class="hero-sub">Introduza os dados da sua casa e receba uma análise completa em 2 minutos — poupanças reais, payback e ROI personalizado para a sua morada em Portugal.</p>
+    <div class="hero-actions">
+      <a href="#calcular" class="btn-sol">⚡ Calcular Agora — Grátis</a>
+      <a href="#como-funciona" class="btn-outline">▶ Ver demonstração</a>
+    </div>
+    <div class="hero-stats">
+      <div class="h-stat">
+        <div class="h-stat-n"><span id="cnt1">0</span></div>
+        <div class="h-stat-l">Habitações analisadas</div>
+      </div>
+      <div class="stat-div"></div>
+      <div class="h-stat">
+        <div class="h-stat-n"><span id="cnt2">0</span><span style="color:var(--sun)">€</span></div>
+        <div class="h-stat-l">Poupança média/ano</div>
+      </div>
+      <div class="stat-div"></div>
+      <div class="h-stat">
+        <div class="h-stat-n"><span id="cnt3">0</span><span style="color:var(--sun);font-size:.9em"> anos</span></div>
+        <div class="h-stat-l">Payback médio PT</div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-right">
+    <div class="globe-ring"></div>
+    <div class="globe-ring-2"></div>
+    <canvas id="globe-canvas"></canvas>
+    <div class="globe-label lbl-portugal"><strong>🇵🇹 Lisboa</strong><span>2.800 horas de sol/ano</span></div>
+    <div class="globe-label lbl-africa"><strong>☀ Algarve</strong><span>Irrad. 1.750 kWh/m²</span></div>
+  </div>
+</section>
+
+<!-- BAND -->
+<div class="band">
+  <div class="band-item"><strong>PVGIS</strong> Base de dados europeia de irradiação</div>
+  <span class="band-sep">·</span>
+  <div class="band-item"><strong>ERSE</strong> Tarifas elétricas oficiais</div>
+  <span class="band-sep">·</span>
+  <div class="band-item"><strong>DGEG</strong> Dados de produção nacional</div>
+  <span class="band-sep">·</span>
+  <div class="band-item"><strong>+12.000</strong> simulações realizadas</div>
+  <span class="band-sep">·</span>
+  <div class="band-item"><strong>Grátis</strong> para sempre</div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="como-funciona">
+  <div class="how-inner">
+    <div class="how-head reveal">
+      <div class="s-label">Processo</div>
+      <h2>Três passos para<br>a sua análise solar</h2>
+      <p class="s-desc">Sem registos, sem complicações. Do zero ao relatório completo em menos de 2 minutos.</p>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card reveal"><div class="step-n">01</div><div class="step-icon">🏠</div><h3>Descreva a sua casa</h3><p>Área do telhado, orientação cardinal, consumo elétrico mensal e concelho em Portugal.</p></div>
+      <div class="step-card reveal" style="transition-delay:.12s"><div class="step-n">02</div><div class="step-icon">🌍</div><h3>Cruzamos com dados reais</h3><p>Usamos o PVGIS com dados de irradiação solar real da sua região — do Minho ao Algarve.</p></div>
+      <div class="step-card reveal" style="transition-delay:.24s"><div class="step-n">03</div><div class="step-icon">📊</div><h3>Receba o seu relatório</h3><p>Poupança anual, payback, ROI, comparação de sistemas e impacto ambiental. Tudo em PDF.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- MAP SECTION -->
+<section class="map-section" id="mapa-solar">
+  <div class="map-inner">
+    <div class="map-grid">
+      <div>
+        <div class="s-label reveal">Mapa Solar</div>
+        <h2 class="reveal">Portugal tem um dos<br>melhores <em>índices solares</em><br>da Europa</h2>
+        <p class="s-desc reveal">Mais horas de sol do que qualquer outra nação da Europa Ocidental. O seu potencial solar depende da sua localização.</p>
+        <div class="map-stats reveal">
+          <div class="map-stat"><div class="map-stat-n">1.750</div><div class="map-stat-l">kWh/m² Algarve</div></div>
+          <div class="map-stat"><div class="map-stat-n">1.450</div><div class="map-stat-l">kWh/m² Porto</div></div>
+        </div>
+        <div class="region-list reveal">
+          <div class="region-item"><span class="region-name">Algarve</span><div class="region-bar-wrap"><div class="region-bar" style="width:98%"></div></div><span class="region-val">1.750</span></div>
+          <div class="region-item"><span class="region-name">Alentejo</span><div class="region-bar-wrap"><div class="region-bar" style="width:90%"></div></div><span class="region-val">1.650</span></div>
+          <div class="region-item"><span class="region-name">Lisboa</span><div class="region-bar-wrap"><div class="region-bar" style="width:82%"></div></div><span class="region-val">1.580</span></div>
+          <div class="region-item"><span class="region-name">Porto</span><div class="region-bar-wrap"><div class="region-bar" style="width:72%"></div></div><span class="region-val">1.450</span></div>
+          <div class="region-item"><span class="region-name">Minho</span><div class="region-bar-wrap"><div class="region-bar" style="width:65%"></div></div><span class="region-val">1.320</span></div>
+        </div>
+      </div>
+      <div class="map-visual reveal">
+        <canvas id="map-canvas"></canvas>
+        <div class="map-legend">
+          <div class="map-legend-title">Irradiação Solar (kWh/m²/ano)</div>
+          <div class="legend-bar"></div>
+          <div class="legend-labels"><span>1.200</span><span>1.400</span><span>1.600</span><span>1.750+</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CALC -->
+<section class="calc-section" id="calcular">
+  <div class="calc-inner">
+    <div>
+      <div class="s-label reveal">Calculadora</div>
+      <h2 class="reveal">Resultados reais,<br>em <em>tempo real</em></h2>
+      <p class="s-desc reveal">Calculamos com dados PVGIS, tarifas ERSE atualizadas e custos reais de instalação em Portugal.</p>
+      <ul class="calc-feats">
+        <li class="calc-feat"><div class="feat-chk">✓</div><div class="feat-txt"><strong>Dados PVGIS da Comissão Europeia</strong><span>Base de dados oficial de irradiação solar</span></div></li>
+        <li class="calc-feat" style="transition-delay:.1s"><div class="feat-chk">✓</div><div class="feat-txt"><strong>Tarifas EDP, Galp e Endesa</strong><span>Atualizadas mensalmente com dados ERSE</span></div></li>
+        <li class="calc-feat" style="transition-delay:.2s"><div class="feat-chk">✓</div><div class="feat-txt"><strong>Relatório PDF exportável</strong><span>Para instaladores, bancos e AT fiscal</span></div></li>
+        <li class="calc-feat" style="transition-delay:.3s"><div class="feat-chk">✓</div><div class="feat-txt"><strong>Comparação de 3 sistemas</strong><span>3 kWp, 5 kWp e 8 kWp lado a lado</span></div></li>
+        <li class="calc-feat" style="transition-delay:.4s"><div class="feat-chk">✓</div><div class="feat-txt"><strong>Incentivos e benefícios fiscais</strong><span>IRS, dedução de IVA e apoios municipais</span></div></li>
+      </ul>
+    </div>
+    <div class="calc-card reveal">
+      <div class="calc-topbar">
+        <div class="dot2 dot2-r"></div><div class="dot2 dot2-y"></div><div class="dot2 dot2-g"></div>
+        <span class="calc-topbar-title">SolarCalc — Simulação ao Vivo</span>
+      </div>
+      <div class="calc-body">
+        <div class="c-row">
+          <div class="c-lbl">Consumo mensal <span class="c-val" id="vConsumo">320 kWh</span></div>
+          <div class="c-track"><div class="c-fill" id="fConsumo" style="width:55%"><div class="c-thumb"></div></div></div>
+        </div>
+        <div class="c-row">
+          <div class="c-lbl">Área do telhado <span class="c-val" id="vArea">28 m²</span></div>
+          <div class="c-track"><div class="c-fill" id="fArea" style="width:40%"><div class="c-thumb"></div></div></div>
+        </div>
+        <div class="c-row">
+          <div class="c-lbl">Localização</div>
+          <div class="loc-pills">
+            <div class="loc-pill active" onclick="setLoc(this,1.0)">Lisboa</div>
+            <div class="loc-pill" onclick="setLoc(this,0.85)">Porto</div>
+            <div class="loc-pill" onclick="setLoc(this,1.15)">Algarve</div>
+            <div class="loc-pill" onclick="setLoc(this,1.1)">Alentejo</div>
+          </div>
+        </div>
+        <div class="c-result">
+          <div class="c-res-row"><span class="c-res-lbl">☀ Produção anual estimada</span><span class="c-res-val" id="rProd">4.340 kWh</span></div>
+          <div class="c-res-row"><span class="c-res-lbl">💰 Poupança anual</span><span class="c-res-val grn" id="rSave">€ 868</span></div>
+          <div class="c-res-row"><span class="c-res-lbl">📅 Payback estimado</span><span class="c-res-val" id="rPay">7.5 anos</span></div>
+          <div class="c-res-row"><span class="c-res-lbl">🌱 CO₂ evitado/ano</span><span class="c-res-val" id="rCo2">2.1 ton</span></div>
+        </div>
+        <button class="c-cta">Ver relatório completo →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="feats">
+  <div class="feats-inner">
+    <div class="feats-head reveal"><div class="s-label">Funcionalidades</div><h2>Tudo para decidir<br>com <em>confiança</em></h2></div>
+    <div class="feats-grid">
+      <div class="f-card reveal"><span class="f-ico">🗺️</span><h3>Mapa Solar Interativo</h3><p>Visualize a irradiação real por concelho. Arraste o mapa 3D e explore o potencial solar de todo o país.</p></div>
+      <div class="f-card reveal" style="transition-delay:.1s"><span class="f-ico">📈</span><h3>Curva de Payback</h3><p>Gráfico interativo que mostra exatamente quando o sistema começa a dar retorno mês a mês.</p></div>
+      <div class="f-card reveal" style="transition-delay:.2s"><span class="f-ico">🏦</span><h3>Simulador de Financiamento</h3><p>Compare compra à vista vs. crédito verde. Integra bonificações de juros e apoios do PRR.</p></div>
+      <div class="f-card reveal" style="transition-delay:.3s"><span class="f-ico">🔋</span><h3>Bateria vs. Sem Bateria</h3><p>Analise se a bateria compensa no seu caso. Muitas vezes não compensa — dizemos-lhe a verdade.</p></div>
+      <div class="f-card reveal" style="transition-delay:.4s"><span class="f-ico">📄</span><h3>Relatório PDF Profissional</h3><p>Exportação completa com todos os dados técnicos. Aceite por instaladores e instituições bancárias.</p></div>
+      <div class="f-card reveal" style="transition-delay:.5s"><span class="f-ico">🌱</span><h3>Calculadora de Impacto CO₂</h3><p>Veja o impacto ambiental em toneladas de CO₂, árvores equivalentes e anos de emissões evitadas.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testi">
+  <div class="testi-head">
+    <div class="s-label reveal" style="justify-content:center">Depoimentos</div>
+    <h2 class="reveal">O que dizem as famílias<br>que já <em>calcularam</em></h2>
+  </div>
+  <div style="overflow:hidden;mask-image:linear-gradient(to right,transparent,black 8%,black 92%,transparent)">
+    <div class="testi-track" id="testi-track"></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-final">
+  <div class="s-label reveal" style="justify-content:center;color:var(--sun-xlt)">Comece Hoje</div>
+  <h2 class="reveal">O sol brilha todos os dias.<br>O seu dinheiro também <em>pode</em>.</h2>
+  <p class="reveal">Calcule gratuitamente em 2 minutos. Sem registo obrigatório, sem compromissos, sem cartão de crédito.</p>
+  <div class="reveal" style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+    <a href="#calcular" class="btn-sol" style="font-size:1rem;padding:16px 32px">⚡ Calcular Poupança Agora</a>
+    <a href="#" class="btn-outline" style="font-size:1rem;padding:16px 26px;border-color:rgba(255,255,255,.15);color:rgba(255,252,245,.8)">Ver planos e preços →</a>
+  </div>
+  <p class="cta-fine reveal">✓ Grátis para sempre <span>·</span> ✓ Sem cartão de crédito <span>·</span> ✓ Dados 100% privados <span>·</span> ✓ RGPD compliant</p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-inner">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <a href="#" class="logo" style="font-size:1.2rem">
+          <div class="logo-sun" style="width:26px;height:26px">
+            <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:#fff"><circle cx="12" cy="12" r="5"/></svg>
+          </div>
+          Solar<span>Calc</span>
+        </a>
+        <p>A calculadora solar mais completa para Portugal. Dados reais, resultados em que pode confiar.</p>
+      </div>
+      <div class="foot-col"><h4>Produto</h4><ul><li><a href="#">Calculadora</a></li><li><a href="#">Funcionalidades</a></li><li><a href="#">Preços</a></li><li><a href="#">API para Instaladores</a></li></ul></div>
+      <div class="foot-col"><h4>Recursos</h4><ul><li><a href="#">Guia Solar PT</a></li><li><a href="#">Incentivos 2026</a></li><li><a href="#">Blog</a></li><li><a href="#">FAQ</a></li></ul></div>
+      <div class="foot-col"><h4>Empresa</h4><ul><li><a href="#">Sobre Nós</a></li><li><a href="#">Contacto</a></li><li><a href="#">Privacidade</a></li><li><a href="#">Termos</a></li></ul></div>
+    </div>
+    <div class="foot-bottom">
+      <p>© 2026 SolarCalc. Todos os direitos reservados.</p>
+      <p>Feito em Portugal 🇵🇹 · LT Technologies</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ─── CURSOR ───────────────────────────────────────────────
+const curDot = document.getElementById('curDot');
+const curRing = document.getElementById('curRing');
+const curEl = document.getElementById('cur');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX; my=e.clientY;
+  curEl.style.left=(mx-5)+'px'; curEl.style.top=(my-5)+'px';
+});
+(function animR(){
+  rx+=(mx-rx-19)*.1; ry+=(my-ry-19)*.1;
+  curRing.style.left=rx+'px'; curRing.style.top=ry+'px';
+  requestAnimationFrame(animR);
+})();
+document.querySelectorAll('a,button,[onclick]').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{curDot.style.transform='scale(2.8)';curDot.style.background='var(--sun-lt)';});
+  el.addEventListener('mouseleave',()=>{curDot.style.transform='scale(1)';curDot.style.background='var(--sun)';});
+});
+
+// ─── NAV SCROLL ───────────────────────────────────────────
+window.addEventListener('scroll',()=>{ document.getElementById('nav').classList.toggle('stuck',scrollY>50); });
+
+// ─── SCROLL REVEAL ────────────────────────────────────────
+const rObs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('in'); });
+},{threshold:.12,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal,.calc-feat,.f-card').forEach(el=>rObs.observe(el));
+
+// ─── COUNTERS ─────────────────────────────────────────────
+function counter(el,target,decimals=0,suffix=''){
+  const dur=2200; const start=performance.now();
+  (function tick(now){
+    const p=Math.min((now-start)/dur,1);
+    const e=1-Math.pow(1-p,3);
+    const v=target*e;
+    el.textContent=(decimals?v.toFixed(decimals):Math.round(v).toLocaleString('pt-PT'))+suffix;
+    if(p<1)requestAnimationFrame(tick);
+  })(start);
+}
+const cObs=new IntersectionObserver(entries=>{
+  if(entries[0].isIntersecting){
+    counter(document.getElementById('cnt1'),12847);
+    counter(document.getElementById('cnt2'),847);
+    counter(document.getElementById('cnt3'),6.8,1);
+    cObs.disconnect();
+  }
+},{threshold:.5});
+cObs.observe(document.querySelector('.hero-stats'));
+
+// ─── THREE.JS GLOBE ───────────────────────────────────────
+(function initGlobe(){
+  const canvas=document.getElementById('globe-canvas');
+  const parent=canvas.parentElement;
+  const W=parent.clientWidth, H=parent.clientHeight;
+  canvas.width=W; canvas.height=H;
+
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(W,H);
+  renderer.setClearColor(0x000000,0);
+
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(45,W/H,.1,100);
+  camera.position.set(0,0,2.8);
+
+  // Ambient + directional light
+  scene.add(new THREE.AmbientLight(0xfff8e8,.6));
+  const sun=new THREE.DirectionalLight(0xffa040,1.4);
+  sun.position.set(3,2,2);
+  scene.add(sun);
+  const fill=new THREE.DirectionalLight(0x88aaff,.3);
+  fill.position.set(-2,-1,-1);
+  scene.add(fill);
+
+  // GLOBE BASE
+  const geo=new THREE.SphereGeometry(1,64,64);
+  const mat=new THREE.MeshPhongMaterial({
+    color:0xD4E8F0, specular:0x4488aa, shininess:40,
+    transparent:true, opacity:.95
+  });
+  const globe=new THREE.Mesh(geo,mat);
+  scene.add(globe);
+
+  // OCEAN (slightly darker blue-teal sphere behind)
+  const oceanGeo=new THREE.SphereGeometry(0.999,64,64);
+  const oceanMat=new THREE.MeshPhongMaterial({color:0x5B9BD5,transparent:true,opacity:.7});
+  const ocean=new THREE.Mesh(oceanGeo,oceanMat);
+  scene.add(ocean);
+
+  // ATMOSPHERE GLOW
+  const atmGeo=new THREE.SphereGeometry(1.06,64,64);
+  const atmMat=new THREE.MeshPhongMaterial({
+    color:0x88ccff, transparent:true, opacity:.08, side:THREE.BackSide
+  });
+  scene.add(new THREE.Mesh(atmGeo,atmMat));
+
+  // WIREFRAME GRID (lat/lon lines)
+  const wireGeo=new THREE.SphereGeometry(1.002,24,16);
+  const wireMat=new THREE.MeshBasicMaterial({color:0xaaccdd,wireframe:true,transparent:true,opacity:.06});
+  scene.add(new THREE.Mesh(wireGeo,wireMat));
+
+  // SOLAR IRRADIANCE DOTS — lat/lon pairs with intensity
+  const solarPoints=[
+    // [lat, lon, intensity 0-1]
+    [37.0,-8.0,1.0],  // Algarve
+    [38.7,-9.1,.88],  // Lisboa
+    [41.1,-8.6,.78],  // Porto
+    [38.5,-8.0,.92],  // Alentejo
+    [40.3,-7.4,.82],  // Interior Centro
+    [39.7,-8.8,.85],  // Santarém
+    [37.6,-7.9,.95],  // Beja
+    [36.97,-25.1,.82],// Açores
+    [32.6,-16.9,.88], // Madeira
+    // Espanha
+    [40.4,-3.7,.83],  // Madrid
+    [37.4,-5.9,.9],   // Sevilha
+    [41.4,2.1,.75],   // Barcelona
+    // Norte Africa
+    [35.7,.63,.95],   // Argélia norte
+    [33.9,-6.8,.96],  // Marrocos norte
+    [31.6,-8.0,.97],  // Marrocos sul
+    // S.Europa
+    [45.4,9.2,.72],   // Milão
+    [48.8,2.3,.62],   // Paris
+    [51.5,-.1,.52],   // Londres
+    [52.4,13.4,.58],  // Berlim
+    [59.9,10.7,.4],   // Oslo
+  ];
+
+  solarPoints.forEach(([lat,lon,intensity])=>{
+    const phi=( 90-lat)*Math.PI/180;
+    const theta=(lon+180)*Math.PI/180;
+    const r=1.01;
+    const x=r*Math.sin(phi)*Math.cos(theta);
+    const y=r*Math.cos(phi);
+    const z=r*Math.sin(phi)*Math.sin(theta);
+
+    const size=0.012+intensity*0.022;
+    const dGeo=new THREE.CircleGeometry(Math.max(0.001,size),8);
+    // Color: cold=blue, warm=orange-red
+    const h=0.08+intensity*0.1; // hue shift
+    const col=new THREE.Color().setHSL(0.08*intensity,0.9,0.35+intensity*.4);
+    const dMat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.7+intensity*.25});
+    const dot=new THREE.Mesh(dGeo,dMat);
+    dot.position.set(x,y,z);
+    dot.lookAt(0,0,0); dot.rotateX(Math.PI);
+    scene.add(dot);
+  });
+
+  // PORTUGAL MARKER (pin)
+  const ptLat=38.7, ptLon=-9.1;
+  const phi=(90-ptLat)*Math.PI/180;
+  const theta=(ptLon+180)*Math.PI/180;
+  const ptPos=new THREE.Vector3(
+    1.05*Math.sin(phi)*Math.cos(theta),
+    1.05*Math.cos(phi),
+    1.05*Math.sin(phi)*Math.sin(theta)
+  );
+  const pinGeo=new THREE.SphereGeometry(.025,12,12);
+  const pinMat=new THREE.MeshBasicMaterial({color:0xE8920A});
+  const pin=new THREE.Mesh(pinGeo,pinMat);
+  pin.position.copy(ptPos);
+  scene.add(pin);
+
+  // RING around Portugal
+  const ringGeo=new THREE.RingGeometry(.04,.05,32);
+  const ringMat=new THREE.MeshBasicMaterial({color:0xE8920A,transparent:true,opacity:.5,side:THREE.DoubleSide});
+  const ptRing=new THREE.Mesh(ringGeo,ringMat);
+  ptRing.position.copy(ptPos);
+  ptRing.lookAt(0,0,0);
+  scene.add(ptRing);
+
+  // Rotate globe to face Portugal
+  globe.rotation.y=0.15;
+  ocean.rotation.y=0.15;
+
+  let autoRotY=0.0015;
+  let isDragging=false,prevX=0;
+  canvas.addEventListener('mousedown',e=>{isDragging=true;prevX=e.clientX;});
+  window.addEventListener('mouseup',()=>{isDragging=false;});
+  window.addEventListener('mousemove',e=>{
+    if(!isDragging)return;
+    const dx=e.clientX-prevX;
+    globe.rotation.y+=dx*.006;
+    ocean.rotation.y+=dx*.006;
+    prevX=e.clientX;
+  });
+
+  let t=0;
+  (function render(){
+    requestAnimationFrame(render);
+    if(!isDragging){
+      globe.rotation.y+=autoRotY;
+      ocean.rotation.y+=autoRotY;
+    }
+    t+=0.02;
+    ptRing.scale.setScalar(1+Math.sin(t)*0.15);
+    pin.position.copy(ptPos.clone().multiplyScalar(1+Math.sin(t)*.008));
+    renderer.render(scene,camera);
+  })();
+
+  window.addEventListener('resize',()=>{
+    const W2=parent.clientWidth, H2=parent.clientHeight;
+    camera.aspect=W2/H2; camera.updateProjectionMatrix();
+    renderer.setSize(W2,H2);
+  });
+})();
+
+// ─── MAP CANVAS (Portugal heatmap) ────────────────────────
+(function initMap(){
+  const canvas=document.getElementById('map-canvas');
+  const parent=canvas.parentElement;
+  const W=parent.clientWidth||500, H=parent.clientHeight||480;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+
+  // Simple stylized Portugal silhouette (approximate path)
+  function drawPortugal(){
+    ctx.clearRect(0,0,W,H);
+    // Background
+    const bg=ctx.createLinearGradient(0,0,W,H);
+    bg.addColorStop(0,'#EEF6FF'); bg.addColorStop(1,'#D4E8F8');
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+    // Heat gradient overlay (south=hot, north=cooler)
+    const heatGrad=ctx.createLinearGradient(0,0,0,H);
+    heatGrad.addColorStop(0,'rgba(74,130,220,.1)');
+    heatGrad.addColorStop(.5,'rgba(244,180,60,.15)');
+    heatGrad.addColorStop(1,'rgba(200,50,20,.2)');
+    ctx.fillStyle=heatGrad; ctx.fillRect(0,0,W,H);
+
+    // Portugal shape (simplified)
+    const pts=[
+      [.22,.05],[.35,.02],[.52,.03],[.62,.06],[.68,.1],
+      [.7,.15],[.72,.22],[.74,.28],[.76,.35],[.78,.42],
+      [.8,.5],[.82,.57],[.78,.63],[.75,.7],[.72,.76],
+      [.68,.82],[.64,.88],[.58,.92],[.52,.95],[.45,.97],
+      [.38,.96],[.32,.93],[.26,.88],[.22,.82],[.18,.75],
+      [.16,.68],[.15,.6],[.16,.52],[.17,.44],[.18,.36],
+      [.19,.28],[.2,.2],[.22,.12],[.22,.05]
+    ].map(([x,y])=>[x*W,y*H]);
+
+    // Fill Portugal with heat gradient
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    pts.slice(1).forEach(([x,y])=>ctx.lineTo(x,y));
+    ctx.closePath();
+    ctx.save();
+    ctx.clip();
+
+    const hg=ctx.createLinearGradient(0,H*.1,0,H*.95);
+    hg.addColorStop(0,'rgba(74,130,220,.4)');
+    hg.addColorStop(.25,'rgba(100,160,220,.35)');
+    hg.addColorStop(.5,'rgba(244,168,35,.45)');
+    hg.addColorStop(.75,'rgba(220,100,20,.5)');
+    hg.addColorStop(1,'rgba(190,40,10,.55)');
+    ctx.fillStyle=hg; ctx.fillRect(0,0,W,H);
+    ctx.restore();
+
+    // Border
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    pts.slice(1).forEach(([x,y])=>ctx.lineTo(x,y));
+    ctx.closePath();
+    ctx.strokeStyle='rgba(100,140,180,.7)'; ctx.lineWidth=2;
+    ctx.stroke();
+
+    // Region labels
+    const labels=[
+      [.38,.15,'Minho','1.320'],
+      [.45,.32,'Porto','1.450'],
+      [.48,.5,'Centro','1.520'],
+      [.47,.63,'Lisboa','1.580'],
+      [.52,.75,'Alentejo','1.650'],
+      [.46,.88,'Algarve','1.750+'],
+    ];
+    labels.forEach(([x,y,name,val])=>{
+      const px=x*W, py=y*H;
+      // Dot
+      ctx.beginPath();
+      ctx.arc(px,py,Math.max(1,4),0,Math.PI*2);
+      ctx.fillStyle='rgba(232,146,10,.8)'; ctx.fill();
+      // Label
+      ctx.font='bold 11px "DM Sans",sans-serif';
+      ctx.fillStyle='#1C1A14'; ctx.textAlign='left';
+      ctx.fillText(name,px+8,py-2);
+      ctx.font='10px "DM Sans",sans-serif';
+      ctx.fillStyle='rgba(28,26,20,.5)';
+      ctx.fillText(val,px+8,py+10);
+    });
+
+    // Atlantic Ocean label
+    ctx.font='italic 12px "Instrument Serif",serif';
+    ctx.fillStyle='rgba(74,130,220,.5)'; ctx.textAlign='center';
+    ctx.fillText('Oceano',W*.08,H*.5);
+    ctx.fillText('Atlântico',W*.08,H*.5+16);
+  }
+  drawPortugal();
+  window.addEventListener('resize',()=>{
+    canvas.width=parent.clientWidth||500;
+    canvas.height=parent.clientHeight||480;
+    drawPortugal();
+  });
+})();
+
+// ─── TESTIMONIALS ─────────────────────────────────────────
+const tData=[
+  {q:'Em 10 minutos percebi que ia poupar €900 por ano. Instalei 3 semanas depois.',n:'Miguel S.',r:'Oeiras, Lisboa',i:'MS'},
+  {q:'O relatório PDF foi fundamental para o banco. Profissional e detalhado.',n:'Ana P.',r:'Braga',i:'AP'},
+  {q:'Comparei com os cálculos do instalador — bateu certo ao cêntimo.',n:'Rui F.',r:'Faro, Algarve',i:'RF'},
+  {q:'Não sabia nada de painéis. Depois de 5 min no SolarCalc já fazia perguntas inteligentes.',n:'Sofia L.',r:'Cascais',i:'SL'},
+  {q:'A comparação com e sem bateria foi decisiva. Poupei €2.000 ao escolher bem.',n:'João M.',r:'Setúbal',i:'JM'},
+  {q:'Mostrei à minha vizinha e ela também instalou. Partilhámos o instalador.',n:'Carla R.',r:'Almada',i:'CR'},
+  {q:'Muito mais completo do que as ferramentas dos instaladores. E grátis!',n:'Pedro A.',r:'Coimbra',i:'PA'},
+  {q:'O simulador de financiamento mostrou-me que o crédito verde compensa imenso.',n:'Helena V.',r:'Évora',i:'HV'},
+];
+const track=document.getElementById('testi-track');
+[...tData,...tData].forEach(t=>{
+  track.innerHTML+=`<div class="t-card">
+    <div class="t-stars">★★★★★</div>
+    <p class="t-q">"${t.q}"</p>
+    <div class="t-author">
+      <div class="t-av">${t.i}</div>
+      <div><div class="t-n">${t.n}</div><div class="t-r">${t.r}</div></div>
+    </div>
+  </div>`;
+});
+
+// ─── LIVE CALCULATOR ──────────────────────────────────────
+let locMult=1.0;
+let cVal=320,aVal=28,cDir=1,aDir=1;
+function calcResults(){
+  const prod=Math.round(aVal*155*locMult);
+  const save=Math.round(prod*0.2);
+  const pay=(6500/Math.max(1,save)).toFixed(1);
+  const co2=(prod*0.000486).toFixed(1);
+  document.getElementById('rProd').textContent=prod.toLocaleString('pt-PT')+' kWh';
+  document.getElementById('rSave').textContent='€ '+save.toLocaleString('pt-PT');
+  document.getElementById('rPay').textContent=pay+' anos';
+  document.getElementById('rCo2').textContent=co2+' ton';
+}
+function setLoc(el,mult){
+  locMult=mult;
+  document.querySelectorAll('.loc-pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  calcResults();
+}
+setInterval(()=>{
+  cVal+=cDir*4; if(cVal>=620||cVal<=130)cDir*=-1;
+  aVal+=aDir*.4; if(aVal>=58||aVal<=12)aDir*=-1;
+  const pC=(cVal-100)/580*100, pA=(aVal-8)/72*100;
+  document.getElementById('fConsumo').style.width=pC+'%';
+  document.getElementById('fArea').style.width=pA+'%';
+  document.getElementById('vConsumo').textContent=Math.round(cVal)+' kWh';
+  document.getElementById('vArea').textContent=Math.round(aVal)+' m²';
+  calcResults();
+},55);
+</script>
+</body>
+</html>
